@@ -1,14 +1,20 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <title>BAR 13 BUST 通信診断</title>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>BAR 13 BUST OPEN CHALLENGE</title>
 
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
   <style>
+
     * {
       box-sizing: border-box;
     }
@@ -18,7 +24,12 @@
       padding: 20px;
       background: #111;
       color: #fff;
-      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Helvetica Neue",
+        Arial,
+        sans-serif;
     }
 
     .container {
@@ -27,315 +38,674 @@
     }
 
     h1 {
-      font-size: 24px;
+      text-align: center;
+      margin: 10px 0 5px;
+      font-size: 26px;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #aaa;
       margin-bottom: 20px;
     }
 
-    .status {
-      padding: 15px;
-      margin-bottom: 10px;
-      border-radius: 10px;
+    .progress {
       background: #222;
-      border: 1px solid #444;
-      white-space: pre-wrap;
-      word-break: break-word;
+      border-radius: 12px;
+      padding: 15px;
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 20px;
+      font-weight: bold;
     }
 
-    .ok {
-      border-color: #22c55e;
-      background: #102818;
+    .challenge {
+      background: #1d1d1d;
+      border-radius: 14px;
+      padding: 18px;
+      margin-bottom: 12px;
+      border: 1px solid #333;
     }
 
-    .error {
-      border-color: #ef4444;
-      background: #301010;
-      color: #ffb4b4;
+    .challenge.completed {
+      border-color: #35d07f;
+      background: #16251d;
     }
 
-    .waiting {
-      border-color: #eab308;
-      background: #302900;
-      color: #ffe88a;
+    .number {
+      font-size: 13px;
+      color: #999;
+      margin-bottom: 5px;
     }
+
+    .title {
+      font-size: 17px;
+      font-weight: bold;
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+
+    button {
+      width: 100%;
+      border: 0;
+      border-radius: 10px;
+      padding: 13px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      background: #fff;
+      color: #111;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    .pending {
+      color: #ffd54a;
+      font-weight: bold;
+      text-align: center;
+      margin-top: 8px;
+      margin-bottom: 10px;
+    }
+
+    .completed-text {
+      color: #35d07f;
+      font-weight: bold;
+      text-align: center;
+      padding: 10px 0;
+    }
+
+    .message {
+      text-align: center;
+      margin: 15px 0;
+      color: #aaa;
+      min-height: 20px;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 50px 20px;
+      color: #aaa;
+    }
+
+    .clear {
+      display: none;
+      background: #35d07f;
+      color: #07140d;
+      padding: 20px;
+      border-radius: 14px;
+      text-align: center;
+      font-weight: bold;
+      margin-bottom: 20px;
+    }
+
   </style>
+
 </head>
+
 
 <body>
 
 <div class="container">
 
-  <h1>BAR 13 BUST<br>通信診断</h1>
+  <h1>BAR 13 BUST</h1>
 
-  <div id="step1" class="status waiting">
-    ① LIFF初期化待ち...
+  <div class="subtitle">
+    OPEN CHALLENGE
   </div>
 
-  <div id="step2" class="status waiting">
-    ② LINEユーザー情報取得待ち...
+
+  <div
+    id="loading"
+    class="loading"
+  >
+    LINEと接続しています...
   </div>
 
-  <div id="step3" class="status waiting">
-    ③ Supabase接続待ち...
-  </div>
 
-  <div id="step4" class="status waiting">
-    ④ データ取得待ち...
-  </div>
+  <div id="app" style="display:none;">
 
-  <div id="result" class="status waiting">
-    結果待ち...
+    <div
+      id="progress"
+      class="progress"
+    >
+      0 / 9 達成
+    </div>
+
+
+    <div
+      id="clear"
+      class="clear"
+    >
+      🎉 9個すべて達成！ 🎉<br><br>
+      スタッフに画面を見せてください。
+    </div>
+
+
+    <div
+      id="message"
+      class="message"
+    ></div>
+
+
+    <div id="challengeList"></div>
+
   </div>
 
 </div>
 
+
 <script>
 
-const LIFF_ID = "2011914396-ReXZiMYU";
-
-const FUNCTION_URL =
-  "https://hbughgnmpvuvxwcfmwd.supabase.co/functions/v1/bar13bust-challenge";
+const LIFF_ID =
+  "2011914396-ReXZiMYU";
 
 
-const step1 = document.getElementById("step1");
-const step2 = document.getElementById("step2");
-const step3 = document.getElementById("step3");
-const step4 = document.getElementById("step4");
-const result = document.getElementById("result");
+const API_URL =
+  "https://script.google.com/macros/s/AKfycbw-yjQaB3fDoxN4U_D7WMxiAPsrAlT5Urgp8pk8vc-eww2YpMJakiBQNN5l_uI0izA/exec";
 
 
-function setOK(element, message) {
-  element.className = "status ok";
-  element.textContent = message;
+let lineUserId = "";
+
+let challenges = [];
+
+let statuses = [];
+
+
+/**
+ * JSONP通信
+ */
+function jsonp(params) {
+
+  return new Promise(
+    function(resolve, reject) {
+
+      const callbackName =
+        "jsonpCallback_" +
+        Date.now() +
+        "_" +
+        Math.floor(
+          Math.random() * 100000
+        );
+
+
+      const script =
+        document.createElement("script");
+
+
+      const query =
+        new URLSearchParams(
+          Object.assign(
+            {},
+            params,
+            {
+              callback: callbackName
+            }
+          )
+        );
+
+
+      const url =
+        API_URL +
+        "?" +
+        query.toString();
+
+
+      const timer =
+        setTimeout(
+          function() {
+
+            cleanup();
+
+            reject(
+              new Error(
+                "通信がタイムアウトしました。"
+              )
+            );
+
+          },
+          15000
+        );
+
+
+      function cleanup() {
+
+        clearTimeout(timer);
+
+        if (script.parentNode) {
+          script.parentNode.removeChild(
+            script
+          );
+        }
+
+        delete window[callbackName];
+      }
+
+
+      window[callbackName] =
+        function(data) {
+
+          cleanup();
+
+          resolve(data);
+        };
+
+
+      script.onerror =
+        function() {
+
+          cleanup();
+
+          reject(
+            new Error(
+              "サーバーとの通信に失敗しました。"
+            )
+          );
+        };
+
+
+      script.src = url;
+
+      document.body.appendChild(
+        script
+      );
+    }
+  );
 }
 
 
-function setError(element, message) {
-  element.className = "status error";
-  element.textContent = message;
-}
-
-
-function setWaiting(element, message) {
-  element.className = "status waiting";
-  element.textContent = message;
-}
-
-
-async function start() {
+/**
+ * 初期化
+ */
+async function init() {
 
   try {
 
-    /* -----------------------------
-       ① LIFF
-    ----------------------------- */
-
-    setWaiting(
-      step1,
-      "① LIFF初期化中..."
-    );
-
+    /*
+     * LIFF初期化
+     */
     await liff.init({
       liffId: LIFF_ID
     });
 
-    setOK(
-      step1,
-      "① LIFF初期化 OK"
-    );
 
+    /*
+     * 外部ブラウザの場合
+     */
+    if (!liff.isLoggedIn()) {
 
-    /* -----------------------------
-       ② LINE User ID
-    ----------------------------- */
+      liff.login({
+        redirectUri:
+          window.location.href
+      });
 
-    setWaiting(
-      step2,
-      "② LINEユーザー情報取得中..."
-    );
-
-    let lineUserId = null;
-
-
-    try {
-
-      const idToken = liff.getDecodedIDToken();
-
-      if (idToken && idToken.sub) {
-        lineUserId = idToken.sub;
-      }
-
-    } catch (e) {
-
-      console.log(e);
-
+      return;
     }
 
 
-    if (!lineUserId) {
-
-      const profile = await liff.getProfile();
-
-      if (profile && profile.userId) {
-        lineUserId = profile.userId;
-      }
-
-    }
+    /*
+     * LINEユーザー情報取得
+     */
+    const profile =
+      await liff.getProfile();
 
 
-    if (!lineUserId) {
+    lineUserId =
+      profile.userId;
+
+
+    /*
+     * Google Apps Scriptからデータ取得
+     */
+    const result =
+      await jsonp({
+        action: "get",
+        line_user_id: lineUserId
+      });
+
+
+    if (!result.ok) {
 
       throw new Error(
-        "LINEユーザーIDを取得できませんでした。"
+        result.error ||
+        "データ取得に失敗しました。"
       );
-
     }
 
 
-    setOK(
-      step2,
-      "② LINEユーザー情報取得 OK\n\n" +
-      "LINE User ID:\n" +
-      lineUserId
-    );
+    challenges =
+      result.challenges || [];
 
 
-    /* -----------------------------
-       ③ Supabase
-       ※ apikeyを付けない
-    ----------------------------- */
-
-    setWaiting(
-      step3,
-      "③ Supabase Edge Functionへ接続中...\n\n" +
-      "apikeyなしで通信します。"
-    );
+    statuses =
+      result.statuses || [];
 
 
-    const requestUrl =
-      FUNCTION_URL +
-      "?line_user_id=" +
-      encodeURIComponent(lineUserId);
+    render();
 
 
-    const response = await fetch(
-      requestUrl,
-      {
-        method: "GET",
-        mode: "cors",
-        cache: "no-store"
-      }
-    );
+    document.getElementById(
+      "loading"
+    ).style.display = "none";
 
 
-    setOK(
-      step3,
-      "③ Supabase Edge Function 接続 OK\n\n" +
-      "HTTP Status: " +
-      response.status
-    );
-
-
-    /* -----------------------------
-       ④ データ
-    ----------------------------- */
-
-    setWaiting(
-      step4,
-      "④ Supabaseデータ確認中..."
-    );
-
-
-    const text = await response.text();
-
-
-    let data;
-
-    try {
-
-      data = JSON.parse(text);
-
-    } catch (e) {
-
-      throw new Error(
-        "JSONではないレスポンスが返りました。\n\n" +
-        text
-      );
-
-    }
-
-
-    if (!response.ok) {
-
-      throw new Error(
-        "HTTP " +
-        response.status +
-        "\n\n" +
-        JSON.stringify(data, null, 2)
-      );
-
-    }
-
-
-    if (
-      !data ||
-      data.ok !== true ||
-      !Array.isArray(data.challenges)
-    ) {
-
-      throw new Error(
-        "想定したデータが返ってきませんでした。\n\n" +
-        JSON.stringify(data, null, 2)
-      );
-
-    }
-
-
-    setOK(
-      step4,
-      "④ Supabaseデータ取得 OK\n\n" +
-      "チャレンジ数: " +
-      data.challenges.length
-    );
-
-
-    /* -----------------------------
-       成功
-    ----------------------------- */
-
-    result.className = "status ok";
-
-    result.textContent =
-      "通信テスト成功！\n\n" +
-      "LINE → LIFF → Supabase\n" +
-      "の通信が正常です。\n\n" +
-      "チャレンジ数: " +
-      data.challenges.length;
+    document.getElementById(
+      "app"
+    ).style.display = "block";
 
 
   } catch (error) {
 
-    result.className = "status error";
+    console.error(error);
 
-    result.textContent =
-      "通信テスト失敗\n\n" +
-      (
-        error && error.message
-          ? error.message
-          : String(error)
+
+    document.getElementById(
+      "loading"
+    ).innerHTML =
+      "エラーが発生しました。<br><br>" +
+      escapeHtml(
+        error.message ||
+        String(error)
       );
+  }
+}
 
 
-    console.error(
-      "通信エラー:",
-      error
+/**
+ * 画面表示
+ */
+function render() {
+
+  const list =
+    document.getElementById(
+      "challengeList"
     );
 
+
+  list.innerHTML = "";
+
+
+  let completedCount = 0;
+
+
+  challenges.forEach(
+    function(challenge, index) {
+
+      const status =
+        statuses[index] || "";
+
+
+      if (status === "completed") {
+        completedCount++;
+      }
+
+
+      const card =
+        document.createElement(
+          "div"
+        );
+
+
+      card.className =
+        "challenge" +
+        (
+          status === "completed"
+            ? " completed"
+            : ""
+        );
+
+
+      let content = "";
+
+
+      content +=
+        '<div class="number">' +
+        "CHALLENGE " +
+        (index + 1) +
+        "</div>";
+
+
+      content +=
+        '<div class="title">' +
+        escapeHtml(challenge) +
+        "</div>";
+
+
+      /*
+       * 達成済み
+       */
+      if (status === "completed") {
+
+        content +=
+          '<div class="completed-text">' +
+          "✓ 達成済み" +
+          "</div>";
+      }
+
+
+      /*
+       * 確認待ち
+       */
+      else if (status === "pending") {
+
+        content +=
+          '<div class="pending">' +
+          "スタッフ確認待ち" +
+          "</div>";
+
+
+        content +=
+          '<button ' +
+          'onclick="confirmChallenge(' +
+          index +
+          ')">' +
+          "スタッフ：達成済みにする" +
+          "</button>";
+      }
+
+
+      /*
+       * 未達成
+       */
+      else {
+
+        content +=
+          '<button ' +
+          'onclick="requestChallenge(' +
+          index +
+          ')">' +
+          "達成する" +
+          "</button>";
+      }
+
+
+      card.innerHTML =
+        content;
+
+
+      list.appendChild(card);
+    }
+  );
+
+
+  document.getElementById(
+    "progress"
+  ).textContent =
+    completedCount +
+    " / 9 達成";
+
+
+  if (completedCount === 9) {
+
+    document.getElementById(
+      "clear"
+    ).style.display =
+      "block";
   }
 
 }
 
 
-start();
+/**
+ * お客様が達成申請
+ */
+async function requestChallenge(index) {
+
+  try {
+
+    showMessage(
+      "処理しています..."
+    );
+
+
+    const result =
+      await jsonp({
+        action: "request",
+        line_user_id: lineUserId,
+        challenge_index: index
+      });
+
+
+    if (!result.ok) {
+
+      throw new Error(
+        result.error ||
+        "処理に失敗しました。"
+      );
+    }
+
+
+    statuses[index] =
+      result.status;
+
+
+    render();
+
+
+    showMessage(
+      "この画面をスタッフに見せてください。"
+    );
+
+
+  } catch (error) {
+
+    showMessage(
+      error.message ||
+      "エラーが発生しました。"
+    );
+  }
+}
+
+
+/**
+ * スタッフが達成確認
+ */
+async function confirmChallenge(index) {
+
+  const ok =
+    window.confirm(
+      "このチャレンジを達成済みにしますか？"
+    );
+
+
+  if (!ok) {
+    return;
+  }
+
+
+  try {
+
+    showMessage(
+      "達成を登録しています..."
+    );
+
+
+    const result =
+      await jsonp({
+        action: "confirm",
+        line_user_id: lineUserId,
+        challenge_index: index
+      });
+
+
+    if (!result.ok) {
+
+      throw new Error(
+        result.error ||
+        "処理に失敗しました。"
+      );
+    }
+
+
+    statuses[index] =
+      result.status;
+
+
+    render();
+
+
+    showMessage(
+      "達成しました！"
+    );
+
+
+  } catch (error) {
+
+    showMessage(
+      error.message ||
+      "エラーが発生しました。"
+    );
+  }
+}
+
+
+/**
+ * メッセージ表示
+ */
+function showMessage(message) {
+
+  document.getElementById(
+    "message"
+  ).textContent =
+    message;
+}
+
+
+/**
+ * HTMLエスケープ
+ */
+function escapeHtml(value) {
+
+  return String(value)
+    .replace(
+      /&/g,
+      "&amp;"
+    )
+    .replace(
+      /</g,
+      "&lt;"
+    )
+    .replace(
+      />/g,
+      "&gt;"
+    )
+    .replace(
+      /"/g,
+      "&quot;"
+    )
+    .replace(
+      /'/g,
+      "&#039;"
+    );
+}
+
+
+/*
+ * 開始
+ */
+init();
 
 </script>
 
