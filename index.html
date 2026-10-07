@@ -38,44 +38,80 @@
 const LIFF_ID = "2011914396-ReXZiMYU";
 const SUPABASE_URL = "https://hbughgnmpvuvxwcfmwd.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_MNf7N_2NxfNOqkFRxaaX5Q_9KXTpBUg";
-const STAFF_PIN = "1313"; // 店舗用。公開前に変更してください。
+const STAFF_PIN = "1313";
 
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 let lineUserId = null;
 let challenges = [];
 let completed = new Set();
 
-function msg(t){const e=document.getElementById("msg");e.textContent=t;e.style.display="block"}
+function msg(t){
+  const e=document.getElementById("msg");
+  e.textContent=t;
+  e.style.display="block";
+}
 function showError(e,where){
-  const detail = e && typeof e === "object" ? (e.message || e.details || e.hint || e.code || JSON.stringify(e)) : String(e);
+  const detail = e && typeof e === "object"
+    ? (e.message || e.details || e.hint || e.code || JSON.stringify(e))
+    : String(e);
   console.error("BAR13 DEBUG", where, e);
   const box=document.getElementById("msg");
   box.style.display="block";
   box.innerHTML=`<b>エラーが発生しました</b><br>場所: ${escapeHtml(where)}<br><small>${escapeHtml(detail)}</small>`;
 }
+function apiUrl(table, query=""){
+  return `${SUPABASE_URL}/rest/v1/${table}?apikey=${encodeURIComponent(SUPABASE_PUBLISHABLE_KEY)}${query ? "&"+query : ""}`;
+}
+async function apiFetch(table, options={}, query=""){
+  const res = await fetch(apiUrl(table, query), {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      "apikey": SUPABASE_PUBLISHABLE_KEY
+    }
+  });
+  const text = await res.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch {}
+  if(!res.ok){
+    const detail = data?.message || data?.details || data?.hint || text || `HTTP ${res.status}`;
+    throw new Error(detail);
+  }
+  return data;
+}
 async function init(){
-  if(LIFF_ID.includes("ここに")) throw new Error("LIFF_IDを設定してください");
   await liff.init({liffId:LIFF_ID});
   if(!liff.isLoggedIn()){ liff.login(); return; }
-  const p=await liff.getProfile(); lineUserId=p.userId;
-  const {data:c,error:ce}=await sb.from("challenges").select("id,title,sort_order").order("id",{ascending:true});
-  if(ce) throw Object.assign(new Error(ce.message||"challenges取得エラー"),{details:ce.details,hint:ce.hint,code:ce.code});
-  challenges=c||[];
-  const {data:d,error:de}=await sb.from("customer_challenges").select("challenge_id,completed").eq("line_user_id",lineUserId).eq("completed",true);
-  if(de) throw Object.assign(new Error(de.message||"customer_challenges取得エラー"),{details:de.details,hint:de.hint,code:de.code});
-  completed=new Set((d||[]).map(x=>x.challenge_id));
+
+  const p=await liff.getProfile();
+  lineUserId=p.userId;
+
+  challenges = await apiFetch(
+    "challenges",
+    {method:"GET"},
+    "select=id%2Ctitle%2Csort_order&order=id.asc"
+  ) || [];
+
+  const d = await apiFetch(
+    "customer_challenges",
+    {method:"GET"},
+    `select=challenge_id%2Ccompleted&line_user_id=eq.${encodeURIComponent(lineUserId)}&completed=eq.true`
+  ) || [];
+
+  completed=new Set(d.map(x=>x.challenge_id));
   render();
 }
 function render(){
-  const list=document.getElementById("list"); list.innerHTML="";
+  const list=document.getElementById("list");
+  list.innerHTML="";
   challenges.forEach((c,i)=>{
     const done=completed.has(c.id), card=document.createElement("div");
     card.className="card"+(done?" done":"");
     card.innerHTML=`<div class="row"><div class="num">${done?"✓":i+1}</div><div class="title">${escapeHtml(c.title)}</div><div class="status">${done?"達成済み":"未達成"}</div></div>`;
     if(!done){
       const a=document.createElement("div"); a.className="actions";
-      const b=document.createElement("button"); b.className="small"; b.textContent="スタッフ確認"; 
-      b.onclick=()=>confirmByStaff(c.id,c.title); a.appendChild(b); card.appendChild(a);
+      const b=document.createElement("button"); b.className="small"; b.textContent="スタッフ確認";
+      b.onclick=()=>confirmByStaff(c.id,c.title);
+      a.appendChild(b); card.appendChild(a);
     }
     list.appendChild(card);
   });
@@ -88,12 +124,36 @@ async function confirmByStaff(id,title){
   const pin=prompt(`「${title}」をスタッフ確認します。\nスタッフPINを入力してください。`);
   if(pin===null)return;
   if(pin!==STAFF_PIN){alert("PINが違います。");return;}
-  const {error}=await sb.from("customer_challenges").insert({line_user_id:lineUserId,challenge_id:id,completed:true});
-  if(error){console.error(error);alert("登録に失敗しました。既に登録済みの場合は再読み込みしてください。");return;}
-  completed.add(id); render(); msg("達成しました！");
+
+  try{
+    await apiFetch(
+      "customer_challenges",
+      {
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json",
+          "Prefer":"return=minimal"
+        },
+        body:JSON.stringify({
+          line_user_id:lineUserId,
+          challenge_id:id,
+          completed:true
+        })
+      }
+    );
+    completed.add(id);
+    render();
+    msg("達成しました！");
+  }catch(e){
+    showError(e,"スタッフ確認");
+  }
 }
-function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
-init().catch(e=>{showError(e,"初期化");});
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g,m=>({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+  }[m]));
+}
+init().catch(e=>showError(e,"初期化"));
 </script>
 </body>
 </html>
