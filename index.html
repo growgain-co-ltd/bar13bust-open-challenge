@@ -65,6 +65,7 @@
       padding: 18px;
       margin-bottom: 12px;
       border: 1px solid #333;
+      transition: 0.15s;
     }
 
     .challenge.completed {
@@ -95,11 +96,11 @@
       cursor: pointer;
       background: #fff;
       color: #111;
+      -webkit-tap-highlight-color: transparent;
     }
 
-    button:disabled {
-      opacity: 0.5;
-      cursor: default;
+    button:active {
+      transform: scale(0.98);
     }
 
     .pending {
@@ -253,9 +254,18 @@ function jsonp(params) {
         query.toString();
 
 
+      let finished = false;
+
+
       const timer =
         setTimeout(
           function() {
+
+            if (finished) {
+              return;
+            }
+
+            finished = true;
 
             cleanup();
 
@@ -287,6 +297,12 @@ function jsonp(params) {
       window[callbackName] =
         function(data) {
 
+          if (finished) {
+            return;
+          }
+
+          finished = true;
+
           cleanup();
 
           resolve(data);
@@ -295,6 +311,12 @@ function jsonp(params) {
 
       script.onerror =
         function() {
+
+          if (finished) {
+            return;
+          }
+
+          finished = true;
 
           cleanup();
 
@@ -323,17 +345,11 @@ async function init() {
 
   try {
 
-    /*
-     * LIFF初期化
-     */
     await liff.init({
       liffId: LIFF_ID
     });
 
 
-    /*
-     * 外部ブラウザの場合
-     */
     if (!liff.isLoggedIn()) {
 
       liff.login({
@@ -345,9 +361,6 @@ async function init() {
     }
 
 
-    /*
-     * LINEユーザー情報取得
-     */
     const profile =
       await liff.getProfile();
 
@@ -357,7 +370,8 @@ async function init() {
 
 
     /*
-     * Google Apps Scriptからデータ取得
+     * Google Apps Scriptから
+     * 現在の状態を取得
      */
     const result =
       await jsonp({
@@ -473,9 +487,6 @@ function render() {
         "</div>";
 
 
-      /*
-       * 達成済み
-       */
       if (status === "completed") {
 
         content +=
@@ -485,9 +496,6 @@ function render() {
       }
 
 
-      /*
-       * 確認待ち
-       */
       else if (status === "pending") {
 
         content +=
@@ -506,9 +514,6 @@ function render() {
       }
 
 
-      /*
-       * 未達成
-       */
       else {
 
         content +=
@@ -537,28 +542,60 @@ function render() {
     " / 9 達成";
 
 
-  if (completedCount === 9) {
-
-    document.getElementById(
-      "clear"
-    ).style.display =
-      "block";
-  }
-
+  document.getElementById(
+    "clear"
+  ).style.display =
+    completedCount === 9
+      ? "block"
+      : "none";
 }
 
 
 /**
  * お客様が達成申請
+ *
+ * ★ここが高速化ポイント
+ *
+ * 画面を先に変更して、
+ * Google Apps Scriptへの保存を
+ * 裏側で行う。
  */
 async function requestChallenge(index) {
 
+  const oldStatus =
+    statuses[index] || "";
+
+
+  /*
+   * すでに処理済みなら何もしない
+   */
+  if (
+    oldStatus === "pending" ||
+    oldStatus === "completed"
+  ) {
+    return;
+  }
+
+
+  /*
+   * 先に画面を変更
+   */
+  statuses[index] =
+    "pending";
+
+
+  render();
+
+
+  showMessage(
+    "この画面をスタッフに見せてください。"
+  );
+
+
+  /*
+   * ここから裏側で保存
+   */
   try {
-
-    showMessage(
-      "処理しています..."
-    );
-
 
     const result =
       await jsonp({
@@ -572,35 +609,37 @@ async function requestChallenge(index) {
 
       throw new Error(
         result.error ||
-        "処理に失敗しました。"
+        "保存に失敗しました。"
       );
     }
 
 
+  } catch (error) {
+
+    /*
+     * 保存失敗時だけ元に戻す
+     */
     statuses[index] =
-      result.status;
+      oldStatus;
 
 
     render();
 
 
     showMessage(
-      "この画面をスタッフに見せてください。"
+      "保存に失敗しました。もう一度お試しください。"
     );
 
 
-  } catch (error) {
-
-    showMessage(
-      error.message ||
-      "エラーが発生しました。"
-    );
+    console.error(error);
   }
 }
 
 
 /**
  * スタッフが達成確認
+ *
+ * ★ここも画面を先に変更
  */
 async function confirmChallenge(index) {
 
@@ -615,12 +654,29 @@ async function confirmChallenge(index) {
   }
 
 
+  const oldStatus =
+    statuses[index];
+
+
+  /*
+   * 先にcompletedに変更
+   */
+  statuses[index] =
+    "completed";
+
+
+  render();
+
+
+  showMessage(
+    "達成しました！"
+  );
+
+
+  /*
+   * ここから裏側で保存
+   */
   try {
-
-    showMessage(
-      "達成を登録しています..."
-    );
-
 
     const result =
       await jsonp({
@@ -634,29 +690,29 @@ async function confirmChallenge(index) {
 
       throw new Error(
         result.error ||
-        "処理に失敗しました。"
+        "保存に失敗しました。"
       );
     }
 
 
+  } catch (error) {
+
+    /*
+     * 保存失敗時は元に戻す
+     */
     statuses[index] =
-      result.status;
+      oldStatus;
 
 
     render();
 
 
     showMessage(
-      "達成しました！"
+      "保存に失敗しました。もう一度お試しください。"
     );
 
 
-  } catch (error) {
-
-    showMessage(
-      error.message ||
-      "エラーが発生しました。"
-    );
+    console.error(error);
   }
 }
 
