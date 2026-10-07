@@ -32,6 +32,7 @@
   <div class="clear" id="clear">🎉 CLEAR！🎉<br><span style="font-size:14px">スタッフに画面を見せて景品GET！</span></div>
   <div class="msg" id="msg"></div>
   <div class="muted">達成した項目はスタッフに確認してもらってください。</div>
+  <div class="muted" style="opacity:.55">Debug: Supabase接続確認版</div>
 </div>
 <script>
 const LIFF_ID = "2011914396-ReXZiMYU";
@@ -44,16 +45,25 @@ let lineUserId = null;
 let challenges = [];
 let completed = new Set();
 
-function msg(t){const e=document.getElementById("msg");e.textContent=t;e.style.display="block";setTimeout(()=>e.style.display="none",2500)}
+function msg(t){const e=document.getElementById("msg");e.textContent=t;e.style.display="block"}
+function showError(e,where){
+  const detail = e && typeof e === "object" ? (e.message || e.details || e.hint || e.code || JSON.stringify(e)) : String(e);
+  console.error("BAR13 DEBUG", where, e);
+  const box=document.getElementById("msg");
+  box.style.display="block";
+  box.innerHTML=`<b>エラーが発生しました</b><br>場所: ${escapeHtml(where)}<br><small>${escapeHtml(detail)}</small>`;
+}
 async function init(){
   if(LIFF_ID.includes("ここに")) throw new Error("LIFF_IDを設定してください");
   await liff.init({liffId:LIFF_ID});
   if(!liff.isLoggedIn()){ liff.login(); return; }
   const p=await liff.getProfile(); lineUserId=p.userId;
-  const {data:c,error:ce}=await sb.from("challenges").select("*").order("id",{ascending:true});
-  if(ce) throw ce; challenges=c||[];
+  const {data:c,error:ce}=await sb.from("challenges").select("id,title,sort_order").order("id",{ascending:true});
+  if(ce) throw Object.assign(new Error(ce.message||"challenges取得エラー"),{details:ce.details,hint:ce.hint,code:ce.code});
+  challenges=c||[];
   const {data:d,error:de}=await sb.from("customer_challenges").select("challenge_id,completed").eq("line_user_id",lineUserId).eq("completed",true);
-  if(de) throw de; completed=new Set((d||[]).map(x=>x.challenge_id));
+  if(de) throw Object.assign(new Error(de.message||"customer_challenges取得エラー"),{details:de.details,hint:de.hint,code:de.code});
+  completed=new Set((d||[]).map(x=>x.challenge_id));
   render();
 }
 function render(){
@@ -83,7 +93,7 @@ async function confirmByStaff(id,title){
   completed.add(id); render(); msg("達成しました！");
 }
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
-init().catch(e=>{console.error(e);alert("初期設定がまだ完了していません。設定値を確認してください。");});
+init().catch(e=>{showError(e,"初期化");});
 </script>
 </body>
 </html>
