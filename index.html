@@ -9,12 +9,9 @@
     content="width=device-width, initial-scale=1.0"
   >
 
-  <title>BAR 13 BUST SPEED TEST</title>
+  <title>BAR 13 BUST OPEN CHALLENGE</title>
 
-  <script
-    src="https://static.line-scdn.net/liff/edge/2/sdk.js"
-    onload="mark('LIFF SDK読み込み完了')"
-  ></script>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
   <style>
 
@@ -42,8 +39,8 @@
 
     h1 {
       text-align: center;
-      font-size: 24px;
-      margin-bottom: 5px;
+      margin: 10px 0 5px;
+      font-size: 26px;
     }
 
     .subtitle {
@@ -52,59 +49,110 @@
       margin-bottom: 20px;
     }
 
-    .status {
-      background: #1d1d1d;
+    .progress {
+      background: #222;
       border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 15px;
-    }
-
-    .row {
-      padding: 10px 0;
-      border-bottom: 1px solid #333;
-    }
-
-    .row:last-child {
-      border-bottom: 0;
-    }
-
-    .name {
-      color: #aaa;
-      font-size: 13px;
-    }
-
-    .value {
-      margin-top: 4px;
-      font-size: 17px;
+      padding: 15px;
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 20px;
       font-weight: bold;
     }
 
-    .ok {
-      color: #35d07f;
+    .challenge {
+      background: #1d1d1d;
+      border-radius: 14px;
+      padding: 18px;
+      margin-bottom: 12px;
+      border: 1px solid #333;
+      transition: 0.15s;
     }
 
-    .wait {
-      color: #ffd54a;
+    .challenge.completed {
+      border-color: #35d07f;
+      background: #16251d;
     }
 
-    .error {
-      color: #ff6565;
-    }
-
-    .result {
-      background: #222;
-      border-radius: 12px;
-      padding: 16px;
-      margin-top: 15px;
-      line-height: 1.8;
-      word-break: break-word;
-    }
-
-    .note {
-      color: #999;
+    .number {
       font-size: 13px;
-      margin-top: 20px;
-      line-height: 1.6;
+      color: #999;
+      margin-bottom: 5px;
+    }
+
+    .title {
+      font-size: 17px;
+      font-weight: bold;
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+
+    button {
+      width: 100%;
+      border: 0;
+      border-radius: 10px;
+      padding: 13px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      background: #fff;
+      color: #111;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+    }
+
+    .pending {
+      color: #ffd54a;
+      font-weight: bold;
+      text-align: center;
+      margin-top: 8px;
+      margin-bottom: 10px;
+    }
+
+    .completed-text {
+      color: #35d07f;
+      font-weight: bold;
+      text-align: center;
+      padding: 10px 0;
+    }
+
+    .message {
+      text-align: center;
+      margin: 15px 0;
+      color: #aaa;
+      min-height: 20px;
+    }
+
+    .sync {
+      text-align: center;
+      color: #777;
+      font-size: 12px;
+      margin: 5px 0 15px;
+      min-height: 18px;
+    }
+
+    .clear {
+      display: none;
+      background: #35d07f;
+      color: #07140d;
+      padding: 20px;
+      border-radius: 14px;
+      text-align: center;
+      font-weight: bold;
+      margin-bottom: 20px;
+    }
+
+    .startup {
+      text-align: center;
+      color: #777;
+      font-size: 13px;
+      padding: 10px;
     }
 
   </style>
@@ -119,109 +167,53 @@
   <h1>BAR 13 BUST</h1>
 
   <div class="subtitle">
-    起動速度テスト
+    OPEN CHALLENGE
   </div>
 
 
-  <div class="status">
+  <div id="app">
 
-    <div class="row">
-      <div class="name">
-        ① ページ読み込み
-      </div>
-
-      <div
-        id="page"
-        class="value wait"
-      >
-        計測中...
-      </div>
+    <div
+      id="progress"
+      class="progress"
+    >
+      0 / 9 達成
     </div>
 
 
-    <div class="row">
-      <div class="name">
-        ② LIFF SDK
-      </div>
-
-      <div
-        id="sdk"
-        class="value wait"
-      >
-        待機中...
-      </div>
+    <div
+      id="clear"
+      class="clear"
+    >
+      🎉 9個すべて達成！ 🎉<br><br>
+      スタッフに画面を見せてください。
     </div>
 
 
-    <div class="row">
-      <div class="name">
-        ③ liff.init()
-      </div>
+    <div
+      id="message"
+      class="message"
+    ></div>
 
-      <div
-        id="init"
-        class="value wait"
-      >
-        待機中...
-      </div>
+
+    <div
+      id="sync"
+      class="sync"
+    >
+      LINEと接続しています...
     </div>
 
 
-    <div class="row">
-      <div class="name">
-        ④ LINEユーザー情報
-      </div>
+    <div id="challengeList"></div>
 
-      <div
-        id="profile"
-        class="value wait"
-      >
-        待機中...
-      </div>
+
+    <div
+      id="startup"
+      class="startup"
+    >
+      起動しています...
     </div>
 
-
-    <div class="row">
-      <div class="name">
-        ⑤ Apps Script通信
-      </div>
-
-      <div
-        id="api"
-        class="value wait"
-      >
-        待機中...
-      </div>
-    </div>
-
-
-    <div class="row">
-      <div class="name">
-        ⑥ 画面表示
-      </div>
-
-      <div
-        id="display"
-        class="value wait"
-      >
-        待機中...
-      </div>
-    </div>
-
-  </div>
-
-
-  <div
-    id="result"
-    class="result"
-  >
-    計測しています...
-  </div>
-
-
-  <div class="note">
-    ※この画面は速度確認専用です。<br>
-    計測終了後、本番用画面に戻します。
   </div>
 
 </div>
@@ -231,7 +223,7 @@
 
 /*
  * =========================
- * 基本設定
+ * 設定
  * =========================
  */
 
@@ -243,92 +235,165 @@ const API_URL =
   "https://script.google.com/macros/s/AKfycbw-yjQaB3fDoxN4U_D7WMxiAPsrAlT5Urgp8pk8vc-eww2YpMJakiBQNN5l_uI0izA/exec";
 
 
+const CHALLENGES = [
+
+  "BAR 13 BUSTに来店",
+
+  "公式LINE友だち登録をする",
+
+  "キープボトルを注文（誰かと一緒に入れるもOK）",
+
+  "スタッフと乾杯（スタッフドリンク1杯）",
+
+  "ショットを注文",
+
+  "ダーツを1回プレイ",
+
+  "スタッフの誰かと写真を撮る",
+
+  "BAR 13 BUSTのInstagramをフォロー",
+
+  "InstagramのストーリーでBAR 13 BUSTをメンションする"
+
+];
+
+
+let lineUserId = "";
+
+let challenges = [...CHALLENGES];
+
+let statuses = [
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  ""
+];
+
+
+/*
+ * Apps Script同期完了状態
+ */
+let syncReady = false;
+
+
+/*
+ * 同期中に押された操作を保存
+ */
+let queuedActions = [];
+
+
+/*
+ * 現在同期中か
+ */
+let syncing = false;
+
+
 /*
  * =========================
- * 計測
+ * キャッシュ
  * =========================
  */
 
-const startTime =
-  performance.now();
-
-
-const times = {};
-
-
-function elapsed() {
+function getCacheKey(userId) {
 
   return (
-    performance.now() -
-    startTime
+    "bar13bust_challenge_" +
+    userId
   );
 }
 
 
-function seconds(ms) {
+function saveCache() {
 
-  return (
-    ms / 1000
-  ).toFixed(2) + "秒";
-}
-
-
-function mark(name) {
-
-  const time =
-    elapsed();
+  if (!lineUserId) {
+    return;
+  }
 
 
-  times[name] =
-    time;
+  try {
 
+    localStorage.setItem(
 
-  console.log(
-    name,
-    seconds(time)
-  );
+      getCacheKey(
+        lineUserId
+      ),
 
+      JSON.stringify({
 
-  /*
-   * SDK読み込み完了
-   */
-  if (
-    name ===
-    "LIFF SDK読み込み完了"
-  ) {
+        challenges:
+          challenges,
 
-    setStatus(
-      "sdk",
-      "OK " + seconds(time),
-      "ok"
+        statuses:
+          statuses,
+
+        savedAt:
+          Date.now()
+
+      })
+
+    );
+
+  } catch (error) {
+
+    console.log(
+      "キャッシュ保存失敗",
+      error
     );
   }
 }
 
 
-/*
- * =========================
- * 表示変更
- * =========================
- */
+function loadCache(userId) {
 
-function setStatus(
-  id,
-  text,
-  className
-) {
+  try {
 
-  const element =
-    document.getElementById(id);
+    const raw =
+      localStorage.getItem(
+        getCacheKey(userId)
+      );
 
 
-  element.textContent =
-    text;
+    if (!raw) {
+      return false;
+    }
 
 
-  element.className =
-    "value " +
-    className;
+    const data =
+      JSON.parse(raw);
+
+
+    if (
+      !data ||
+      !Array.isArray(
+        data.statuses
+      )
+    ) {
+
+      return false;
+    }
+
+
+    statuses =
+      data.statuses;
+
+
+    return true;
+
+  } catch (error) {
+
+    console.log(
+      "キャッシュ読み込み失敗",
+      error
+    );
+
+
+    return false;
+  }
 }
 
 
@@ -344,7 +409,7 @@ function jsonp(params) {
     function(resolve, reject) {
 
       const callbackName =
-        "speedTest_" +
+        "jsonpCallback_" +
         Date.now() +
         "_" +
         Math.floor(
@@ -360,6 +425,7 @@ function jsonp(params) {
 
       const query =
         new URLSearchParams(
+
           Object.assign(
             {},
             params,
@@ -368,10 +434,11 @@ function jsonp(params) {
                 callbackName
             }
           )
+
         );
 
 
-      const url =
+      script.src =
         API_URL +
         "?" +
         query.toString();
@@ -398,7 +465,7 @@ function jsonp(params) {
 
             reject(
               new Error(
-                "15秒でタイムアウト"
+                "通信がタイムアウトしました。"
               )
             );
 
@@ -463,14 +530,10 @@ function jsonp(params) {
 
           reject(
             new Error(
-              "通信エラー"
+              "サーバーとの通信に失敗しました。"
             )
           );
         };
-
-
-      script.src =
-        url;
 
 
       document.body.appendChild(
@@ -484,155 +547,316 @@ function jsonp(params) {
 
 /*
  * =========================
- * メイン処理
+ * 画面表示
  * =========================
  */
 
-async function runTest() {
+function render() {
 
-  /*
-   * ① ページ読み込み
-   */
+  const list =
+    document.getElementById(
+      "challengeList"
+    );
 
-  setStatus(
-    "page",
-    "OK " +
-    seconds(
-      elapsed()
-    ),
-    "ok"
+
+  list.innerHTML = "";
+
+
+  let completedCount = 0;
+
+
+  challenges.forEach(
+    function(challenge, index) {
+
+      const status =
+        statuses[index] || "";
+
+
+      if (
+        status === "completed"
+      ) {
+
+        completedCount++;
+      }
+
+
+      const card =
+        document.createElement(
+          "div"
+        );
+
+
+      card.className =
+        "challenge" +
+        (
+          status === "completed"
+            ? " completed"
+            : ""
+        );
+
+
+      let content = "";
+
+
+      content +=
+        '<div class="number">' +
+        "CHALLENGE " +
+        (index + 1) +
+        "</div>";
+
+
+      content +=
+        '<div class="title">' +
+        escapeHtml(
+          challenge
+        ) +
+        "</div>";
+
+
+      /*
+       * 達成済み
+       */
+      if (
+        status === "completed"
+      ) {
+
+        content +=
+          '<div class="completed-text">' +
+          "✓ 達成済み" +
+          "</div>";
+
+      }
+
+
+      /*
+       * 確認待ち
+       */
+      else if (
+        status === "pending"
+      ) {
+
+        content +=
+          '<div class="pending">' +
+          "スタッフ確認待ち" +
+          "</div>";
+
+
+        content +=
+          '<button ' +
+          'onclick="confirmChallenge(' +
+          index +
+          ')">' +
+          "スタッフ：達成済みにする" +
+          "</button>";
+
+      }
+
+
+      /*
+       * 未達成
+       */
+      else {
+
+        content +=
+          '<button ' +
+          'onclick="requestChallenge(' +
+          index +
+          ')">' +
+          "達成する" +
+          "</button>";
+      }
+
+
+      card.innerHTML =
+        content;
+
+
+      list.appendChild(
+        card
+      );
+
+    }
   );
 
 
+  document.getElementById(
+    "progress"
+  ).textContent =
+    completedCount +
+    " / 9 達成";
+
+
+  document.getElementById(
+    "clear"
+  ).style.display =
+    completedCount === 9
+      ? "block"
+      : "none";
+}
+
+
+/*
+ * =========================
+ * 初期表示
+ * =========================
+ */
+
+function showInitialScreen() {
+
   /*
-   * ③ LIFF init
+   * LIFFやApps Scriptを待たず、
+   * 最初から9項目を表示
    */
 
-  setStatus(
-    "init",
-    "処理中...",
-    "wait"
-  );
+  challenges =
+    [...CHALLENGES];
 
 
-  const initStart =
-    performance.now();
+  statuses = [
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    ""
+  ];
+
+
+  render();
+
+
+  document.getElementById(
+    "startup"
+  ).style.display =
+    "none";
+}
+
+
+/*
+ * =========================
+ * LIFF初期化
+ * =========================
+ */
+
+async function init() {
+
+  /*
+   * まず画面を表示
+   *
+   * ここでは一切待たない
+   */
+
+  showInitialScreen();
 
 
   try {
 
+    /*
+     * LIFF初期化
+     */
     await liff.init({
       liffId:
         LIFF_ID
     });
 
 
-    const initTime =
-      performance.now() -
-      initStart;
-
-
-    times.liffInit =
-      initTime;
-
-
-    setStatus(
-      "init",
-      "OK " +
-      seconds(initTime),
-      "ok"
-    );
-
-
-  } catch (error) {
-
-    setStatus(
-      "init",
-      "ERROR",
-      "error"
-    );
-
-
-    showResult(
-      "LIFF初期化でエラーが発生しました。<br><br>" +
-      escapeHtml(
-        error.message ||
-        String(error)
-      )
-    );
-
-
-    return;
-  }
-
-
-  /*
-   * ④ LINEユーザー情報
-   */
-
-  const profileStart =
-    performance.now();
-
-
-  try {
-
+    /*
+     * 外部ブラウザの場合
+     */
     if (
       !liff.isLoggedIn()
     ) {
-
-      setStatus(
-        "profile",
-        "LINEログインへ移動",
-        "wait"
-      );
-
 
       liff.login({
         redirectUri:
           window.location.href
       });
 
-
       return;
     }
 
 
+    /*
+     * LINEユーザー情報
+     */
     const profile =
       await liff.getProfile();
 
 
-    const profileTime =
-      performance.now() -
-      profileStart;
-
-
-    times.profile =
-      profileTime;
-
-
-    setStatus(
-      "profile",
-      "OK " +
-      seconds(profileTime),
-      "ok"
-    );
+    lineUserId =
+      profile.userId;
 
 
     /*
-     * ⑤ Apps Script
+     * LINE取得後、
+     * ユーザー専用キャッシュを即表示
      */
-
-    setStatus(
-      "api",
-      "通信中...",
-      "wait"
+    loadCache(
+      lineUserId
     );
 
 
-    const apiStart =
-      performance.now();
+    render();
 
 
+    /*
+     * ここからApps Script同期
+     *
+     * 画面表示は待たない
+     */
+    syncWithServer();
+
+
+  } catch (error) {
+
+    console.error(
+      error
+    );
+
+
+    document.getElementById(
+      "sync"
+    ).textContent =
+      "LINEとの接続に失敗しました。";
+
+  }
+}
+
+
+/*
+ * =========================
+ * サーバー同期
+ * =========================
+ */
+
+async function syncWithServer() {
+
+  if (
+    syncing ||
+    !lineUserId
+  ) {
+
+    return;
+  }
+
+
+  syncing = true;
+
+
+  document.getElementById(
+    "sync"
+  ).textContent =
+    "最新情報を確認しています...";
+
+
+  try {
+
+    /*
+     * Apps Scriptへ問い合わせ
+     */
     const result =
       await jsonp({
 
@@ -640,18 +864,9 @@ async function runTest() {
           "get",
 
         line_user_id:
-          profile.userId
+          lineUserId
 
       });
-
-
-    const apiTime =
-      performance.now() -
-      apiStart;
-
-
-    times.api =
-      apiTime;
 
 
     if (
@@ -660,118 +875,416 @@ async function runTest() {
 
       throw new Error(
         result.error ||
-        "APIエラー"
+        "データ取得に失敗しました。"
       );
     }
 
 
-    setStatus(
-      "api",
-      "OK " +
-      seconds(apiTime),
-      "ok"
-    );
+    /*
+     * サーバーの最新状態を反映
+     */
+    challenges =
+      result.challenges || [
+        ...CHALLENGES
+      ];
+
+
+    statuses =
+      result.statuses || [
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ];
 
 
     /*
-     * ⑥ 画面表示
+     * キャッシュ更新
      */
-
-    const displayStart =
-      performance.now();
+    saveCache();
 
 
     /*
-     * 今回はデータを受け取って
-     * 表示できるところまで
+     * 最新状態を表示
      */
+    render();
+
+
+    syncReady =
+      true;
+
 
     document.getElementById(
-      "display"
+      "sync"
     ).textContent =
-      "OK " +
-      seconds(
-        performance.now() -
-        displayStart
-      );
-
-
-    document.getElementById(
-      "display"
-    ).className =
-      "value ok";
+      "";
 
 
     /*
-     * 結果
+     * 同期中に押された操作を処理
      */
-
-    showResult(
-
-      "<strong>速度計測結果</strong><br><br>" +
-
-      "LIFF初期化：" +
-      seconds(
-        times.liffInit
-      ) +
-      "<br>" +
-
-      "LINE情報取得：" +
-      seconds(
-        times.profile
-      ) +
-      "<br>" +
-
-      "Apps Script：" +
-      seconds(
-        times.api
-      ) +
-      "<br><br>" +
-
-      "<strong>ページ読み込み開始から：" +
-      seconds(
-        elapsed()
-      ) +
-      "</strong>"
-
-    );
+    await processQueuedActions();
 
 
   } catch (error) {
 
-    setStatus(
-      "api",
-      "ERROR",
-      "error"
+    console.error(
+      error
     );
 
 
-    showResult(
-      "通信でエラーが発生しました。<br><br>" +
-      escapeHtml(
-        error.message ||
-        String(error)
-      )
-    );
+    /*
+     * 通信失敗でも、
+     * 画面はそのまま使用可能
+     */
+    document.getElementById(
+      "sync"
+    ).textContent =
+      "通信確認中";
+
+
+  } finally {
+
+    syncing =
+      false;
   }
-
 }
 
 
 /*
  * =========================
- * 結果表示
+ * 同期前の操作処理
  * =========================
  */
 
-function showResult(
-  html
+async function processQueuedActions() {
+
+  if (
+    queuedActions.length === 0
+  ) {
+
+    return;
+  }
+
+
+  const actions =
+    [...queuedActions];
+
+
+  queuedActions =
+    [];
+
+
+  for (
+    const action of actions
+  ) {
+
+    try {
+
+      if (
+        action.type ===
+        "request"
+      ) {
+
+        await sendRequest(
+          action.index
+        );
+
+      }
+
+
+      else if (
+        action.type ===
+        "confirm"
+      ) {
+
+        await sendConfirm(
+          action.index
+        );
+
+      }
+
+    } catch (error) {
+
+      console.error(
+        error
+      );
+    }
+  }
+}
+
+
+/*
+ * =========================
+ * 達成申請
+ * =========================
+ */
+
+async function requestChallenge(
+  index
+) {
+
+  const oldStatus =
+    statuses[index] || "";
+
+
+  if (
+    oldStatus === "pending" ||
+    oldStatus === "completed"
+  ) {
+
+    return;
+  }
+
+
+  /*
+   * 画面を即変更
+   */
+  statuses[index] =
+    "pending";
+
+
+  render();
+
+
+  showMessage(
+    "この画面をスタッフに見せてください。"
+  );
+
+
+  saveCache();
+
+
+  /*
+   * LINE情報取得直後で
+   * サーバー同期がまだの場合
+   */
+  if (
+    !syncReady
+  ) {
+
+    queuedActions.push({
+      type: "request",
+      index: index
+    });
+
+
+    return;
+  }
+
+
+  /*
+   * 通常処理
+   */
+  try {
+
+    await sendRequest(
+      index
+    );
+
+  } catch (error) {
+
+    statuses[index] =
+      oldStatus;
+
+
+    saveCache();
+
+
+    render();
+
+
+    showMessage(
+      "保存に失敗しました。もう一度お試しください。"
+    );
+
+  }
+}
+
+
+/*
+ * =========================
+ * 達成申請をサーバー保存
+ * =========================
+ */
+
+async function sendRequest(
+  index
+) {
+
+  const result =
+    await jsonp({
+
+      action:
+        "request",
+
+      line_user_id:
+        lineUserId,
+
+      challenge_index:
+        index
+
+    });
+
+
+  if (
+    !result.ok
+  ) {
+
+    throw new Error(
+      result.error ||
+      "保存に失敗しました。"
+    );
+  }
+}
+
+
+/*
+ * =========================
+ * スタッフ確認
+ * =========================
+ */
+
+async function confirmChallenge(
+  index
+) {
+
+  const ok =
+    window.confirm(
+      "このチャレンジを達成済みにしますか？"
+    );
+
+
+  if (!ok) {
+
+    return;
+  }
+
+
+  const oldStatus =
+    statuses[index];
+
+
+  /*
+   * 即座に画面変更
+   */
+  statuses[index] =
+    "completed";
+
+
+  render();
+
+
+  showMessage(
+    "達成しました！"
+  );
+
+
+  saveCache();
+
+
+  /*
+   * 同期前ならキューへ
+   */
+  if (
+    !syncReady
+  ) {
+
+    queuedActions.push({
+      type: "confirm",
+      index: index
+    });
+
+
+    return;
+  }
+
+
+  /*
+   * 通常処理
+   */
+  try {
+
+    await sendConfirm(
+      index
+    );
+
+  } catch (error) {
+
+    statuses[index] =
+      oldStatus;
+
+
+    saveCache();
+
+
+    render();
+
+
+    showMessage(
+      "保存に失敗しました。もう一度お試しください。"
+    );
+
+  }
+}
+
+
+/*
+ * =========================
+ * スタッフ確認をサーバー保存
+ * =========================
+ */
+
+async function sendConfirm(
+  index
+) {
+
+  const result =
+    await jsonp({
+
+      action:
+        "confirm",
+
+      line_user_id:
+        lineUserId,
+
+      challenge_index:
+        index
+
+    });
+
+
+  if (
+    !result.ok
+  ) {
+
+    throw new Error(
+      result.error ||
+      "保存に失敗しました。"
+    );
+  }
+}
+
+
+/*
+ * =========================
+ * メッセージ
+ * =========================
+ */
+
+function showMessage(
+  message
 ) {
 
   document.getElementById(
-    "result"
-  ).innerHTML =
-    html;
+    "message"
+  ).textContent =
+    message;
 }
 
 
@@ -816,11 +1329,11 @@ function escapeHtml(
 
 /*
  * =========================
- * 実行
+ * 起動
  * =========================
  */
 
-runTest();
+init();
 
 </script>
 
