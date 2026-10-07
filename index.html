@@ -44,69 +44,76 @@ let lineUserId = null;
 let challenges = [];
 let completed = new Set();
 
-function msg(t){
+function setDebug(text){
   const e=document.getElementById("msg");
-  e.textContent=t;
   e.style.display="block";
+  e.innerHTML=text;
 }
-function showError(e,where){
-  const detail = e && typeof e === "object"
-    ? (e.message || e.details || e.hint || e.code || JSON.stringify(e))
-    : String(e);
-  console.error("BAR13 DEBUG", where, e);
-  const box=document.getElementById("msg");
-  box.style.display="block";
-  box.innerHTML=`<b>エラーが発生しました</b><br>場所: ${escapeHtml(where)}<br><small>${escapeHtml(detail)}</small>`;
+function esc(s){
+  return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
 }
-function apiUrl(table, query=""){
-  return `${SUPABASE_URL}/rest/v1/${table}?apikey=${encodeURIComponent(SUPABASE_PUBLISHABLE_KEY)}${query ? "&"+query : ""}`;
+function fail(where,e){
+  const detail=e?.message || e?.details || e?.hint || String(e);
+  console.error(where,e);
+  setDebug(`<b>接続エラー</b><br>場所：${esc(where)}<br><small>${esc(detail)}</small>`);
 }
-async function apiFetch(table, options={}, query=""){
-  const res = await fetch(apiUrl(table, query), {
-    ...options,
-    headers: {
-      ...(options.headers || {}),
-      "apikey": SUPABASE_PUBLISHABLE_KEY
+async function supa(table, query){
+  const url = `${SUPABASE_URL}/rest/v1/${table}?${query}`;
+  const r = await fetch(url,{
+    method:"GET",
+    mode:"cors",
+    headers:{
+      "apikey":SUPABASE_PUBLISHABLE_KEY,
+      "Accept":"application/json"
     }
   });
-  const text = await res.text();
-  let data = null;
-  try { data = text ? JSON.parse(text) : null; } catch {}
-  if(!res.ok){
-    const detail = data?.message || data?.details || data?.hint || text || `HTTP ${res.status}`;
-    throw new Error(detail);
-  }
+  const text=await r.text();
+  let data=null;
+  try{data=text?JSON.parse(text):null}catch{}
+  if(!r.ok) throw new Error(data?.message || data?.details || data?.hint || text || `HTTP ${r.status}`);
   return data;
 }
 async function init(){
-  await liff.init({liffId:LIFF_ID});
-  if(!liff.isLoggedIn()){ liff.login(); return; }
+  try{
+    setDebug("LINE認証を確認中…");
+    await liff.init({liffId:LIFF_ID});
+    setDebug("LINE認証：OK<br>プロフィールを確認中…");
 
-  const p=await liff.getProfile();
-  lineUserId=p.userId;
+    if(!liff.isLoggedIn()){
+      liff.login();
+      return;
+    }
 
-  challenges = await apiFetch(
-    "challenges",
-    {method:"GET"},
-    "select=id%2Ctitle%2Csort_order&order=id.asc"
-  ) || [];
+    const p=await liff.getProfile();
+    lineUserId=p.userId;
+    setDebug("LINE認証：OK<br>プロフィール：OK<br>Supabaseへ接続中…");
 
-  const d = await apiFetch(
-    "customer_challenges",
-    {method:"GET"},
-    `select=challenge_id%2Ccompleted&line_user_id=eq.${encodeURIComponent(lineUserId)}&completed=eq.true`
-  ) || [];
+    challenges = await supa(
+      "challenges",
+      "select=id%2Ctitle%2Csort_order&order=id.asc"
+    ) || [];
 
-  completed=new Set(d.map(x=>x.challenge_id));
-  render();
+    setDebug(`LINE認証：OK<br>Supabase接続：OK<br>チャレンジ取得：${challenges.length}件`);
+
+    const d=await supa(
+      "customer_challenges",
+      `select=challenge_id%2Ccompleted&line_user_id=eq.${encodeURIComponent(lineUserId)}&completed=eq.true`
+    ) || [];
+
+    completed=new Set(d.map(x=>x.challenge_id));
+    render();
+  }catch(e){
+    fail("初期化",e);
+  }
 }
 function render(){
   const list=document.getElementById("list");
   list.innerHTML="";
   challenges.forEach((c,i)=>{
-    const done=completed.has(c.id), card=document.createElement("div");
+    const done=completed.has(c.id);
+    const card=document.createElement("div");
     card.className="card"+(done?" done":"");
-    card.innerHTML=`<div class="row"><div class="num">${done?"✓":i+1}</div><div class="title">${escapeHtml(c.title)}</div><div class="status">${done?"達成済み":"未達成"}</div></div>`;
+    card.innerHTML=`<div class="row"><div class="num">${done?"✓":i+1}</div><div class="title">${esc(c.title)}</div><div class="status">${done?"達成済み":"未達成"}</div></div>`;
     if(!done){
       const a=document.createElement("div"); a.className="actions";
       const b=document.createElement("button"); b.className="small"; b.textContent="スタッフ確認";
@@ -124,36 +131,22 @@ async function confirmByStaff(id,title){
   const pin=prompt(`「${title}」をスタッフ確認します。\nスタッフPINを入力してください。`);
   if(pin===null)return;
   if(pin!==STAFF_PIN){alert("PINが違います。");return;}
-
   try{
-    await apiFetch(
-      "customer_challenges",
-      {
-        method:"POST",
-        headers:{
-          "Content-Type":"application/json",
-          "Prefer":"return=minimal"
-        },
-        body:JSON.stringify({
-          line_user_id:lineUserId,
-          challenge_id:id,
-          completed:true
-        })
-      }
-    );
-    completed.add(id);
-    render();
-    msg("達成しました！");
-  }catch(e){
-    showError(e,"スタッフ確認");
-  }
+    const r=await fetch(`${SUPABASE_URL}/rest/v1/customer_challenges`,{
+      method:"POST",
+      mode:"cors",
+      headers:{
+        "apikey":SUPABASE_PUBLISHABLE_KEY,
+        "Content-Type":"application/json",
+        "Prefer":"return=minimal"
+      },
+      body:JSON.stringify({line_user_id:lineUserId,challenge_id:id,completed:true})
+    });
+    if(!r.ok) throw new Error(await r.text());
+    completed.add(id); render(); setDebug("達成しました！");
+  }catch(e){fail("スタッフ確認",e);}
 }
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g,m=>({
-    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
-  }[m]));
-}
-init().catch(e=>showError(e,"初期化"));
+init();
 </script>
 </body>
 </html>
