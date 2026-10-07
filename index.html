@@ -1,152 +1,101 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>BAR 13 BUST OPEN CHALLENGE</title>
-  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <style>
-    *{box-sizing:border-box} body{margin:0;background:#101010;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif}
-    .wrap{max-width:560px;margin:auto;padding:20px 16px 40px}.hero{text-align:center;padding:18px 0 12px}
-    h1{font-size:25px;margin:0 0 6px;letter-spacing:.04em}.sub{color:#bbb;font-size:13px}
-    .count{font-size:28px;font-weight:800;margin:18px 0 4px}.bar{height:9px;background:#333;border-radius:99px;overflow:hidden}.bar i{display:block;height:100%;background:#fff;width:0}
-    .card{background:#1c1c1c;border:1px solid #333;border-radius:16px;padding:14px;margin-top:12px}
-    .row{display:flex;align-items:center;gap:12px}.num{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:#333;font-weight:700;flex:none}
-    .done .num{background:#fff;color:#111}.title{font-weight:700;line-height:1.45}.status{margin-left:auto;font-size:12px;color:#999}.done .status{color:#fff}
-    button{border:0;border-radius:12px;padding:11px 14px;font-weight:700;cursor:pointer;background:#fff;color:#111}.small{font-size:12px;padding:8px 10px;margin-top:10px}
-    .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.muted{color:#999;font-size:12px;margin-top:16px;line-height:1.6}
-    .clear{display:none;text-align:center;background:#fff;color:#111;border-radius:16px;padding:18px;margin-top:16px;font-weight:800;font-size:20px}
-    .msg{margin-top:12px;padding:10px;border-radius:10px;background:#292929;font-size:13px;display:none}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>BAR 13 BUST 接続診断</title>
+<style>
+body{margin:0;background:#111;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;padding:24px 16px}
+h1{font-size:25px;text-align:center;margin:20px 0 8px}
+.sub{text-align:center;color:#bbb;margin-bottom:24px}
+.box{background:#292929;border-radius:14px;padding:16px;margin:12px 0}
+.ok{color:#6ee7a8}.ng{color:#ff7777}.wait{color:#ffd166}
+.label{font-weight:700;margin-bottom:6px}.detail{font-size:13px;color:#bbb;word-break:break-word;white-space:pre-wrap}
+</style>
 </head>
 <body>
-<div class="wrap">
-  <div class="hero">
-    <h1>BAR 13 BUST<br>OPEN CHALLENGE</h1>
-    <div class="sub">9個達成で景品GET！</div>
-    <div class="count" id="count">0 / 9 CLEAR</div>
-    <div class="bar"><i id="bar"></i></div>
-  </div>
-  <div id="list"></div>
-  <div class="clear" id="clear">🎉 CLEAR！🎉<br><span style="font-size:14px">スタッフに画面を見せて景品GET！</span></div>
-  <div class="msg" id="msg"></div>
-  <div class="muted">達成した項目はスタッフに確認してもらってください。</div>
-  <div class="muted" style="opacity:.55">Debug: Supabase接続確認版</div>
-</div>
+<h1>BAR 13 BUST</h1>
+<div class="sub">接続診断</div>
+<div id="status" class="box"><div class="label">診断中…</div><div class="detail">LINE SDKの読み込みを確認しています。</div></div>
+<div id="steps"></div>
+
 <script>
-const LIFF_ID = "2011914396-ReXZiMYU";
-const SUPABASE_URL = "https://hbughgnmpvuvxwcfmwd.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_MNf7N_2NxfNOqkFRxaaX5Q_9KXTpBUg";
-const STAFF_PIN = "1313";
+const LIFF_ID="2011914396-ReXZiMYU";
+const SUPABASE_URL="https://hbughgnmpvuvxwcfmwd.supabase.co";
+const SUPABASE_KEY="sb_publishable_MNf7N_2NxfNOqkFRxaaX5Q_9KXTpBUg";
 
-let lineUserId = null;
-let challenges = [];
-let completed = new Set();
+const stepsEl=document.getElementById("steps");
+const statusEl=document.getElementById("status");
 
-function setDebug(text){
-  const e=document.getElementById("msg");
-  e.style.display="block";
-  e.innerHTML=text;
+function addStep(name,state,detail=""){
+  const d=document.createElement("div");
+  d.className="box";
+  d.innerHTML=`<div class="label ${state==="OK"?"ok":state==="NG"?"ng":"wait"}">${state==="OK"?"✓":state==="NG"?"✕":"…"} ${name}: ${state}</div><div class="detail">${escapeHtml(detail)}</div>`;
+  stepsEl.appendChild(d);
 }
-function esc(s){
-  return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 }
-function fail(where,e){
-  const detail=e?.message || e?.details || e?.hint || String(e);
-  console.error(where,e);
-  setDebug(`<b>接続エラー</b><br>場所：${esc(where)}<br><small>${esc(detail)}</small>`);
+function errText(e){
+  return (e && (e.stack||e.message||e.toString())) || String(e);
 }
-async function supa(table, query){
-  const url = `${SUPABASE_URL}/rest/v1/${table}?${query}`;
-  const r = await fetch(url,{
-    method:"GET",
-    mode:"cors",
-    headers:{
-      "apikey":SUPABASE_PUBLISHABLE_KEY,
-      "Accept":"application/json"
-    }
+function setStatus(title,detail,cls){
+  statusEl.innerHTML=`<div class="label ${cls||""}">${escapeHtml(title)}</div><div class="detail">${escapeHtml(detail)}</div>`;
+}
+
+async function loadLiffSdk(){
+  return new Promise((resolve,reject)=>{
+    if(window.liff){resolve();return;}
+    const s=document.createElement("script");
+    s.src="https://static.line-scdn.net/liff/edge/2/sdk.js";
+    s.onload=()=>resolve();
+    s.onerror=()=>reject(new Error("LINE SDK script の読み込みに失敗しました"));
+    document.head.appendChild(s);
   });
-  const text=await r.text();
-  let data=null;
-  try{data=text?JSON.parse(text):null}catch{}
-  if(!r.ok) throw new Error(data?.message || data?.details || data?.hint || text || `HTTP ${r.status}`);
-  return data;
 }
-async function init(){
-  try{
-    setDebug("LINE認証を確認中…");
-    await liff.init({liffId:LIFF_ID});
-    setDebug("LINE認証：OK<br>プロフィールを確認中…");
 
-    if(!liff.isLoggedIn()){
-      liff.login();
+(async()=>{
+  try{
+    addStep("LINE SDK読み込み","WAIT");
+    await loadLiffSdk();
+    addStep("LINE SDK読み込み","OK","window.liff が利用可能です。");
+
+    addStep("LIFF初期化","WAIT");
+    await liff.init({liffId:LIFF_ID});
+    addStep("LIFF初期化","OK","LIFF ID: "+LIFF_ID);
+
+    addStep("LINEログイン状態","WAIT");
+    const logged=liff.isLoggedIn();
+    addStep("LINEログイン状態","OK","isLoggedIn = "+logged);
+
+    if(!logged){
+      setStatus("LINEログインが必要です","この画面からログインを開始します。","wait");
+      liff.login({redirectUri:location.href});
       return;
     }
 
+    addStep("LINEプロフィール取得","WAIT");
     const p=await liff.getProfile();
-    lineUserId=p.userId;
-    setDebug("LINE認証：OK<br>プロフィール：OK<br>Supabaseへ接続中…");
+    addStep("LINEプロフィール取得","OK","userId取得成功（IDは表示しません）");
 
-    challenges = await supa(
-      "challenges",
-      "select=id%2Ctitle%2Csort_order&order=id.asc"
-    ) || [];
-
-    setDebug(`LINE認証：OK<br>Supabase接続：OK<br>チャレンジ取得：${challenges.length}件`);
-
-    const d=await supa(
-      "customer_challenges",
-      `select=challenge_id%2Ccompleted&line_user_id=eq.${encodeURIComponent(lineUserId)}&completed=eq.true`
-    ) || [];
-
-    completed=new Set(d.map(x=>x.challenge_id));
-    render();
-  }catch(e){
-    fail("初期化",e);
-  }
-}
-function render(){
-  const list=document.getElementById("list");
-  list.innerHTML="";
-  challenges.forEach((c,i)=>{
-    const done=completed.has(c.id);
-    const card=document.createElement("div");
-    card.className="card"+(done?" done":"");
-    card.innerHTML=`<div class="row"><div class="num">${done?"✓":i+1}</div><div class="title">${esc(c.title)}</div><div class="status">${done?"達成済み":"未達成"}</div></div>`;
-    if(!done){
-      const a=document.createElement("div"); a.className="actions";
-      const b=document.createElement("button"); b.className="small"; b.textContent="スタッフ確認";
-      b.onclick=()=>confirmByStaff(c.id,c.title);
-      a.appendChild(b); card.appendChild(a);
-    }
-    list.appendChild(card);
-  });
-  const n=completed.size,total=challenges.length;
-  document.getElementById("count").textContent=`${n} / ${total} CLEAR`;
-  document.getElementById("bar").style.width=(total?Math.round(n/total*100):0)+"%";
-  document.getElementById("clear").style.display=(total&&n>=total)?"block":"none";
-}
-async function confirmByStaff(id,title){
-  const pin=prompt(`「${title}」をスタッフ確認します。\nスタッフPINを入力してください。`);
-  if(pin===null)return;
-  if(pin!==STAFF_PIN){alert("PINが違います。");return;}
-  try{
-    const r=await fetch(`${SUPABASE_URL}/rest/v1/customer_challenges`,{
-      method:"POST",
-      mode:"cors",
+    addStep("Supabase接続","WAIT");
+    const r=await fetch(SUPABASE_URL+"/rest/v1/challenges?select=id,title,sort_order&order=id.asc",{
       headers:{
-        "apikey":SUPABASE_PUBLISHABLE_KEY,
-        "Content-Type":"application/json",
-        "Prefer":"return=minimal"
-      },
-      body:JSON.stringify({line_user_id:lineUserId,challenge_id:id,completed:true})
+        "apikey":SUPABASE_KEY,
+        "Authorization":"Bearer "+SUPABASE_KEY
+      }
     });
-    if(!r.ok) throw new Error(await r.text());
-    completed.add(id); render(); setDebug("達成しました！");
-  }catch(e){fail("スタッフ確認",e);}
-}
-init();
+    const txt=await r.text();
+    if(!r.ok) throw new Error("Supabase HTTP "+r.status+"\\n"+txt);
+    const rows=JSON.parse(txt);
+    addStep("Supabase接続","OK","challenges取得成功: "+rows.length+"件");
+
+    setStatus("診断完了","すべて正常です。上の結果をスクショして送ってください。","ok");
+  }catch(e){
+    setStatus("診断エラー","どの段階で止まったかを確認してください。","ng");
+    addStep("エラー詳細","NG",errText(e));
+  }
+})();
 </script>
 </body>
 </html>
