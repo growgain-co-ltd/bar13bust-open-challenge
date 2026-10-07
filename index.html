@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <title>BAR 13 BUST LIFF診断</title>
+  <title>BAR 13 BUST Supabase診断</title>
 
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
@@ -58,18 +58,6 @@
       color: #ffe88a;
     }
 
-    button {
-      width: 100%;
-      padding: 15px;
-      margin-top: 15px;
-      border: none;
-      border-radius: 10px;
-      background: #06c755;
-      color: white;
-      font-size: 16px;
-      font-weight: bold;
-    }
-
     .small {
       margin-top: 20px;
       font-size: 12px;
@@ -83,35 +71,34 @@
 
 <div class="container">
 
-  <h1>BAR 13 BUST<br>LIFF診断</h1>
+  <h1>BAR 13 BUST<br>Supabase診断</h1>
 
   <div id="step1" class="status waiting">
-    ① HTML読み込み中...
+    ① LIFF初期化待ち...
   </div>
 
   <div id="step2" class="status waiting">
-    ② LINE SDK読み込み待ち...
+    ② LINEユーザー情報取得待ち...
   </div>
 
   <div id="step3" class="status waiting">
-    ③ LIFF初期化待ち...
+    ③ Supabase接続待ち...
   </div>
 
   <div id="step4" class="status waiting">
-    ④ LINEログイン状態確認待ち...
+    ④ チャレンジ取得待ち...
   </div>
 
-  <div id="step5" class="status waiting">
-    ⑤ LINEユーザー情報取得待ち...
+  <div id="result" class="status waiting">
+    結果待ち...
   </div>
-
-  <button id="loginButton" style="display:none;">
-    LINEログインを開始
-  </button>
 
   <div class="small">
-    URL:<br>
-    <span id="currentUrl"></span>
+    LIFF ID:<br>
+    <span id="liffId"></span>
+    <br><br>
+    Edge Function:<br>
+    <span id="functionUrl"></span>
   </div>
 
 </div>
@@ -120,13 +107,21 @@
 
 const LIFF_ID = "2011914396-ReXZiMYU";
 
+const FUNCTION_URL =
+  "https://hbughgnmpvuvxwcfmwd.supabase.co/functions/v1/bar13bust-challenge";
+
+const SUPABASE_KEY =
+  "sb_publishable_MNf7N_2NxfNOqkFRxaaX5Q_9KXTpBUg";
+
+
 const step1 = document.getElementById("step1");
 const step2 = document.getElementById("step2");
 const step3 = document.getElementById("step3");
 const step4 = document.getElementById("step4");
-const step5 = document.getElementById("step5");
-const loginButton = document.getElementById("loginButton");
-const currentUrl = document.getElementById("currentUrl");
+const result = document.getElementById("result");
+
+document.getElementById("liffId").textContent = LIFF_ID;
+document.getElementById("functionUrl").textContent = FUNCTION_URL;
 
 
 function setOK(element, message) {
@@ -147,53 +142,17 @@ function setWaiting(element, message) {
 }
 
 
-currentUrl.textContent = location.href;
-
-
 /* ---------------------------------
-   ① HTML
+   LIFF初期化
 --------------------------------- */
 
-setOK(
-  step1,
-  "① HTML読み込み OK"
-);
-
-
-/* ---------------------------------
-   ② LINE SDK
---------------------------------- */
-
-if (typeof liff === "undefined") {
-
-  setError(
-    step2,
-    "② LINE SDK読み込み失敗\n\nliff が見つかりません。\nLINE SDK自体を読み込めていません。"
-  );
-
-} else {
-
-  setOK(
-    step2,
-    "② LINE SDK読み込み OK"
-  );
-
-  initializeLIFF();
-
-}
-
-
-/* ---------------------------------
-   ③ LIFF初期化
---------------------------------- */
-
-async function initializeLIFF() {
+async function start() {
 
   try {
 
     setWaiting(
-      step3,
-      "③ LIFF初期化中..."
+      step1,
+      "① LIFF初期化中..."
     );
 
     await liff.init({
@@ -201,151 +160,221 @@ async function initializeLIFF() {
     });
 
     setOK(
-      step3,
-      "③ LIFF初期化 OK"
+      step1,
+      "① LIFF初期化 OK"
     );
 
 
     /* ---------------------------------
-       ④ LINEログイン状態
+       LINEユーザー情報
     --------------------------------- */
+
+    setWaiting(
+      step2,
+      "② LINEユーザー情報取得中..."
+    );
+
+    let lineUserId = null;
+
 
     try {
 
-      const inClient = liff.isInClient();
-      const loggedIn = liff.isLoggedIn();
+      const idToken = liff.getDecodedIDToken();
 
-      setOK(
-        step4,
-        "④ LINE状態確認 OK\n\n" +
-        "LIFF内: " + inClient + "\n" +
-        "ログイン済み: " + loggedIn
-      );
-
-
-      /* ---------------------------------
-         未ログイン
-      --------------------------------- */
-
-      if (!loggedIn) {
-
-        loginButton.style.display = "block";
-
-        setWaiting(
-          step5,
-          "⑤ LINEユーザー情報\n\n" +
-          "まだログインしていません。\n" +
-          "下の「LINEログインを開始」を押してください。"
-        );
-
-        loginButton.onclick = function() {
-
-          liff.login({
-            redirectUri: location.href
-          });
-
-        };
-
-        return;
+      if (idToken && idToken.sub) {
+        lineUserId = idToken.sub;
       }
-
-
-      /* ---------------------------------
-         ⑤ ユーザー情報
-      --------------------------------- */
-
-      setWaiting(
-        step5,
-        "⑤ LINEユーザー情報取得中..."
-      );
-
-
-      let userId = null;
-
-
-      try {
-
-        const idToken = liff.getDecodedIDToken();
-
-        if (idToken && idToken.sub) {
-          userId = idToken.sub;
-        }
-
-      } catch (e) {
-
-        console.log(
-          "getDecodedIDToken error:",
-          e
-        );
-
-      }
-
-
-      if (!userId) {
-
-        try {
-
-          const profile = await liff.getProfile();
-
-          if (profile && profile.userId) {
-            userId = profile.userId;
-          }
-
-        } catch (e) {
-
-          console.log(
-            "getProfile error:",
-            e
-          );
-
-        }
-
-      }
-
-
-      if (!userId) {
-
-        throw new Error(
-          "LINEユーザーIDを取得できませんでした。"
-        );
-
-      }
-
-
-      setOK(
-        step5,
-        "⑤ LINEユーザー情報取得 OK\n\n" +
-        "LINE User ID:\n" +
-        userId
-      );
-
 
     } catch (error) {
 
-      setError(
-        step4,
-        "④ LINE状態確認エラー\n\n" +
-        error.message
+      console.log(
+        "getDecodedIDToken error:",
+        error
       );
 
     }
 
 
+    if (!lineUserId) {
+
+      const profile = await liff.getProfile();
+
+      if (profile && profile.userId) {
+        lineUserId = profile.userId;
+      }
+
+    }
+
+
+    if (!lineUserId) {
+
+      throw new Error(
+        "LINEユーザーIDを取得できませんでした。"
+      );
+
+    }
+
+
+    setOK(
+      step2,
+      "② LINEユーザー情報取得 OK\n\n" +
+      "LINE User ID:\n" +
+      lineUserId
+    );
+
+
+    /* ---------------------------------
+       Supabase接続
+    --------------------------------- */
+
+    setWaiting(
+      step3,
+      "③ Supabase Edge Functionへ接続中..."
+    );
+
+
+    const requestUrl =
+      FUNCTION_URL +
+      "?line_user_id=" +
+      encodeURIComponent(lineUserId);
+
+
+    const response = await fetch(
+      requestUrl,
+      {
+        method: "GET",
+
+        headers: {
+          "apikey": SUPABASE_KEY
+        },
+
+        mode: "cors",
+
+        cache: "no-store"
+      }
+    );
+
+
+    if (!response.ok) {
+
+      const text = await response.text();
+
+      throw new Error(
+        "HTTP " +
+        response.status +
+        "\n\n" +
+        text
+      );
+
+    }
+
+
+    const data = await response.json();
+
+
+    setOK(
+      step3,
+      "③ Supabase接続 OK\n\n" +
+      "HTTP Status: " +
+      response.status
+    );
+
+
+    /* ---------------------------------
+       チャレンジ取得
+    --------------------------------- */
+
+    setWaiting(
+      step4,
+      "④ チャレンジデータ確認中..."
+    );
+
+
+    if (
+      !data ||
+      data.ok !== true ||
+      !Array.isArray(data.challenges)
+    ) {
+
+      throw new Error(
+        "Supabaseから想定したデータが返ってきませんでした。\n\n" +
+        JSON.stringify(data, null, 2)
+      );
+
+    }
+
+
+    const challenges = data.challenges;
+
+    const completed = Array.isArray(data.completed)
+      ? data.completed
+      : [];
+
+
+    setOK(
+      step4,
+      "④ チャレンジ取得 OK\n\n" +
+      "チャレンジ数: " +
+      challenges.length +
+      "\n" +
+      "達成済み: " +
+      completed.length
+    );
+
+
+    /* ---------------------------------
+       最終結果
+    --------------------------------- */
+
+    let text =
+      "⑤ Supabase接続テスト成功！\n\n" +
+      "LINE User ID:\n" +
+      lineUserId +
+      "\n\n" +
+      "取得したチャレンジ:\n";
+
+
+    challenges.forEach(function(challenge) {
+
+      text +=
+        challenge.sort_order +
+        ". " +
+        challenge.title +
+        "\n";
+
+    });
+
+
+    result.className = "status ok";
+    result.textContent = text;
+
+
   } catch (error) {
 
-    setError(
-      step3,
-      "③ LIFF初期化失敗\n\n" +
-      "エラー:\n" +
-      error.message +
-      "\n\n" +
-      "LIFF ID:\n" +
-      LIFF_ID
+    const message =
+      error && error.message
+        ? error.message
+        : String(error);
+
+
+    result.className = "status error";
+
+    result.textContent =
+      "Supabase接続テスト失敗\n\n" +
+      message;
+
+
+    console.error(
+      "Supabase diagnostic error:",
+      error
     );
 
   }
 
 }
+
+
+start();
 
 </script>
 
