@@ -6,95 +6,52 @@
 <title>BAR 13 BUST 接続診断</title>
 <style>
 body{margin:0;background:#111;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;padding:24px 16px}
-h1{font-size:25px;text-align:center;margin:20px 0 8px}
-.sub{text-align:center;color:#bbb;margin-bottom:24px}
-.box{background:#292929;border-radius:14px;padding:16px;margin:12px 0}
-.ok{color:#6ee7a8}.ng{color:#ff7777}.wait{color:#ffd166}
+h1{text-align:center;font-size:25px;margin:20px 0 8px}.sub{text-align:center;color:#aaa;margin-bottom:24px}
+.box{background:#292929;border-radius:14px;padding:16px;margin:12px 0}.ok{color:#6ee7a8}.ng{color:#ff7777}.wait{color:#ffd166}
 .label{font-weight:700;margin-bottom:6px}.detail{font-size:13px;color:#bbb;word-break:break-word;white-space:pre-wrap}
 </style>
 </head>
 <body>
-<h1>BAR 13 BUST</h1>
-<div class="sub">接続診断</div>
-<div id="status" class="box"><div class="label">診断中…</div><div class="detail">LINE SDKの読み込みを確認しています。</div></div>
+<h1>BAR 13 BUST</h1><div class="sub">接続診断</div>
+<div id="status" class="box"><div class="label wait">診断中…</div><div class="detail">接続を確認しています。</div></div>
 <div id="steps"></div>
-
 <script>
 const LIFF_ID="2011914396-ReXZiMYU";
 const SUPABASE_URL="https://hbughgnmpvvuxvwcfmwd.supabase.co";
 const SUPABASE_KEY="sb_publishable_MNf7N_2NxfNOqkFRxaaX5Q_9KXTpBUg";
 
-const stepsEl=document.getElementById("steps");
-const statusEl=document.getElementById("status");
+const steps=document.getElementById("steps"), status=document.getElementById("status");
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
+function step(name,state,detail=""){const d=document.createElement("div");d.className="box";d.innerHTML=`<div class="label ${state==="OK"?"ok":state==="NG"?"ng":"wait"}">${state==="OK"?"✓":state==="NG"?"✕":"…"} ${name}: ${state}</div><div class="detail">${esc(detail)}</div>`;steps.appendChild(d);}
+function fail(e){status.innerHTML=`<div class="label ng">診断エラー</div><div class="detail">${esc(e?.stack||e?.message||String(e))}</div>`;}
+function setOK(t,d){status.innerHTML=`<div class="label ok">✓ ${esc(t)}</div><div class="detail">${esc(d)}</div>`;}
 
-function addStep(name,state,detail=""){
-  const d=document.createElement("div");
-  d.className="box";
-  d.innerHTML=`<div class="label ${state==="OK"?"ok":state==="NG"?"ng":"wait"}">${state==="OK"?"✓":state==="NG"?"✕":"…"} ${name}: ${state}</div><div class="detail">${escapeHtml(detail)}</div>`;
-  stepsEl.appendChild(d);
+async function sdk(){
+ return new Promise((resolve,reject)=>{
+  if(window.liff)return resolve();
+  const s=document.createElement("script");
+  s.src="https://static.line-scdn.net/liff/edge/2/sdk.js";
+  s.onload=resolve;s.onerror=()=>reject(new Error("LINE SDKの読み込みに失敗しました"));document.head.appendChild(s);
+ });
 }
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
-}
-function errText(e){
-  return (e && (e.stack||e.message||e.toString())) || String(e);
-}
-function setStatus(title,detail,cls){
-  statusEl.innerHTML=`<div class="label ${cls||""}">${escapeHtml(title)}</div><div class="detail">${escapeHtml(detail)}</div>`;
-}
-
-async function loadLiffSdk(){
-  return new Promise((resolve,reject)=>{
-    if(window.liff){resolve();return;}
-    const s=document.createElement("script");
-    s.src="https://static.line-scdn.net/liff/edge/2/sdk.js";
-    s.onload=()=>resolve();
-    s.onerror=()=>reject(new Error("LINE SDK script の読み込みに失敗しました"));
-    document.head.appendChild(s);
-  });
-}
-
 (async()=>{
-  try{
-    addStep("LINE SDK読み込み","WAIT");
-    await loadLiffSdk();
-    addStep("LINE SDK読み込み","OK","window.liff が利用可能です。");
+ try{
+  step("LINE SDK読み込み","WAIT"); await sdk(); step("LINE SDK読み込み","OK","window.liff OK");
+  step("LIFF初期化","WAIT"); await liff.init({liffId:LIFF_ID}); step("LIFF初期化","OK",LIFF_ID);
+  step("LINEログイン状態","WAIT"); const logged=liff.isLoggedIn(); step("LINEログイン状態","OK","isLoggedIn = "+logged);
+  if(!logged){liff.login({redirectUri:location.href});return;}
+  step("LINEプロフィール取得","WAIT"); await liff.getProfile(); step("LINEプロフィール取得","OK","userId取得成功");
 
-    addStep("LIFF初期化","WAIT");
-    await liff.init({liffId:LIFF_ID});
-    addStep("LIFF初期化","OK","LIFF ID: "+LIFF_ID);
-
-    addStep("LINEログイン状態","WAIT");
-    const logged=liff.isLoggedIn();
-    addStep("LINEログイン状態","OK","isLoggedIn = "+logged);
-
-    if(!logged){
-      setStatus("LINEログインが必要です","この画面からログインを開始します。","wait");
-      liff.login({redirectUri:location.href});
-      return;
-    }
-
-    addStep("LINEプロフィール取得","WAIT");
-    const p=await liff.getProfile();
-    addStep("LINEプロフィール取得","OK","userId取得成功（IDは表示しません）");
-
-    addStep("Supabase接続","WAIT");
-    const r=await fetch(SUPABASE_URL+"/rest/v1/challenges?select=id,title,sort_order&order=id.asc",{
-      headers:{
-        "apikey":SUPABASE_KEY,
-        "Authorization":"Bearer "+SUPABASE_KEY
-      }
-    });
-    const txt=await r.text();
-    if(!r.ok) throw new Error("Supabase HTTP "+r.status+"\\n"+txt);
-    const rows=JSON.parse(txt);
-    addStep("Supabase接続","OK","challenges取得成功: "+rows.length+"件");
-
-    setStatus("診断完了","すべて正常です。上の結果をスクショして送ってください。","ok");
-  }catch(e){
-    setStatus("診断エラー","どの段階で止まったかを確認してください。","ng");
-    addStep("エラー詳細","NG",errText(e));
-  }
+  // まずカスタムHTTPヘッダーを使わず、APIキーをURLパラメータで送る方式をテスト
+  step("Supabase REST接続","WAIT");
+  const url=SUPABASE_URL+"/rest/v1/challenges?select=id%2Ctitle%2Csort_order&order=id.asc&apikey="+encodeURIComponent(SUPABASE_KEY);
+  const r=await fetch(url,{method:"GET",mode:"cors",cache:"no-store"});
+  const txt=await r.text();
+  if(!r.ok) throw new Error("Supabase HTTP "+r.status+"\\n"+txt);
+  const rows=JSON.parse(txt);
+  step("Supabase REST接続","OK","challenges取得成功: "+rows.length+"件");
+  setOK("診断完了","Supabaseまで接続できました。結果をスクショしてください。");
+ }catch(e){fail(e);step("エラー詳細","NG",e?.stack||e?.message||String(e));}
 })();
 </script>
 </body>
