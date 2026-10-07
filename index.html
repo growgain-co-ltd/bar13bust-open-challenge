@@ -45,6 +45,7 @@ button.disabled{opacity:.55}
 <script>
 const LIFF_ID="2011914396-ReXZiMYU";
 const FUNCTION_URL="https://hbughgnmpvuvxwcfmwd.supabase.co/functions/v1/bar13bust-challenge";
+const SUPABASE_KEY="sb_publishable_MNf7N_2NxfNOqkFRxaaX5Q_9KXTpBUg";
 
 let lineUserId="";
 let challenges=[];
@@ -63,7 +64,16 @@ function showError(msg){
 }
 
 async function api(url,options={}){
-  const r=await fetch(url,{...options,mode:"cors",cache:"no-store"});
+  const r=await fetch(url,{
+    ...options,
+    mode:"cors",
+    cache:"no-store",
+    headers:{
+      "apikey":SUPABASE_KEY,
+      "Authorization":"Bearer "+SUPABASE_KEY,
+      ...(options.headers||{})
+    }
+  });
   const text=await r.text();
   let data;
   try{data=JSON.parse(text)}catch(e){throw new Error("HTTP "+r.status+"\n"+text)}
