@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>BAR 13 BUST OPEN CHALLENGE</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#111;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;padding:22px 16px 40px}
+.wrap{max-width:560px;margin:auto}
+h1{text-align:center;font-size:27px;line-height:1.25;margin:12px 0 6px;font-weight:800}
+.sub{text-align:center;color:#bbb;font-size:15px;margin-bottom:18px}
+.count{text-align:center;font-size:36px;font-weight:800;margin:8px 0}
+.bar{height:10px;background:#333;border-radius:99px;overflow:hidden;margin-bottom:18px}
+.fill{height:100%;background:#67e8ab;width:0}
+.card{background:#252525;border-radius:15px;padding:14px;margin-top:10px}
+.row{display:flex;align-items:center;gap:12px}
+.num{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:#3a3a3a;font-weight:800;flex:none}
+.body{flex:1;min-width:0}
+.title{font-size:18px;font-weight:800;line-height:1.4}
+.hint{color:#999;font-size:13px;margin-top:4px}
+button{border:0;border-radius:12px;padding:12px 14px;font-weight:800;background:#fff;color:#111;cursor:pointer}
+button.done{background:#67e8ab;color:#111}
+button.disabled{opacity:.55}
+.notice{margin-top:12px;background:#333;border:1px solid #67e8ab;border-radius:12px;padding:12px;font-size:14px;line-height:1.6}
+.confirm{margin-top:10px;width:100%;background:#67e8ab}
+.cancel{margin-top:8px;width:100%;background:#444;color:#fff}
+.clear{display:none;background:#173b2b;border:1px solid #67e8ab;border-radius:15px;padding:18px;text-align:center;margin-top:18px;font-size:22px;font-weight:800}
+.note{text-align:center;color:#999;font-size:12px;margin-top:18px;line-height:1.6}
+.error{display:none;background:#382323;color:#ff8d8d;border-radius:12px;padding:12px;margin-top:12px;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>BAR 13 BUST<br>OPEN CHALLENGE</h1>
+  <div class="sub">9個達成で景品GET！</div>
+  <div class="count" id="count">0 / 9 CLEAR</div>
+  <div class="bar"><div class="fill" id="fill"></div></div>
+  <div id="error" class="error"></div>
+  <div id="list"></div>
+  <div id="clear" class="clear">🎉 CLEAR！🎉<br><span style="font-size:14px">スタッフに画面を見せて景品GET！</span></div>
+  <div class="note">「達成する」を押した後、画面をスタッフに見せて「達成確定」を押してもらってください。</div>
+</div>
+
+<script>
+const LIFF_ID="2011914396-ReXZiMYU";
+const FUNCTION_URL="https://hbughgnmpvuvxwcfmwd.supabase.co/functions/v1/bar13bust-challenge";
+
+let lineUserId="";
+let challenges=[];
+let completed=new Set();
+let pendingId=null;
+
+const $=id=>document.getElementById(id);
+
+function esc(s){
+  return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+}
+
+function showError(msg){
+  $("error").textContent=msg;
+  $("error").style.display="block";
+}
+
+async function api(url,options={}){
+  const r=await fetch(url,{...options,mode:"cors",cache:"no-store"});
+  const text=await r.text();
+  let data;
+  try{data=JSON.parse(text)}catch(e){throw new Error("HTTP "+r.status+"\n"+text)}
+  if(!r.ok || data.ok===false) throw new Error(data.error||("HTTP "+r.status));
+  return data;
+}
+
+function render(){
+  const list=$("list");
+  list.innerHTML="";
+  challenges.forEach((c,i)=>{
+    const done=completed.has(c.id);
+    const card=document.createElement("div");
+    card.className="card";
+    card.innerHTML=`
+      <div class="row">
+        <div class="num">${done?"✓":i+1}</div>
+        <div class="body">
+          <div class="title">${esc(c.title)}</div>
+          <div class="hint">${done?"達成済み":(pendingId===c.id?"スタッフ確認待ち":"スタッフ確認後に達成")}</div>
+        </div>
+        ${done?'<button class="done" disabled>✓ 達成</button>':
+          pendingId===c.id?'': '<button onclick="startChallenge('+Number(c.id)+')">達成する</button>'}
+      </div>
+      ${pendingId===c.id&&!done?`
+        <div class="notice">
+          <strong>この画面をスタッフに見せてください。</strong><br>
+          スタッフが内容を確認したら、下の「達成確定」を押してください。
+        </div>
+        <button class="confirm" onclick="confirmChallenge(${Number(c.id)})">達成確定</button>
+        <button class="cancel" onclick="cancelPending()">キャンセル</button>
+      `:""}
+    `;
+    list.appendChild(card);
+  });
+
+  const n=completed.size,total=challenges.length;
+  $("count").textContent=`${n} / ${total} CLEAR`;
+  $("fill").style.width=(total?Math.round(n/total*100):0)+"%";
+  $("clear").style.display=(total&&n>=total)?"block":"none";
+}
+
+function startChallenge(id){
+  if(completed.has(id))return;
+  pendingId=id;
+  render();
+}
+
+function cancelPending(){
+  pendingId=null;
+  render();
+}
+
+async function confirmChallenge(id){
+  if(completed.has(id))return;
+  if(pendingId!==id)return;
+
+  const buttons=document.querySelectorAll("button");
+  buttons.forEach(b=>b.disabled=true);
+
+  try{
+    await api(FUNCTION_URL,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({line_user_id:lineUserId,challenge_id:id})
+    });
+    completed.add(id);
+    pendingId=null;
+    render();
+  }catch(e){
+    showError("達成確定に失敗しました。\n"+(e.message||String(e)));
+    render();
+  }
+}
+
+window.startChallenge=startChallenge;
+window.confirmChallenge=confirmChallenge;
+window.cancelPending=cancelPending;
+
+(async()=>{
+  try{
+    const s=document.createElement("script");
+    s.src="https://static.line-scdn.net/liff/edge/2/sdk.js";
+    s.onload=async()=>{
+      try{
+        await liff.init({liffId:LIFF_ID});
+        if(!liff.isLoggedIn()){
+          liff.login({redirectUri:location.href});
+          return;
+        }
+        const p=await liff.getProfile();
+        lineUserId=p.userId;
+
+        const data=await api(FUNCTION_URL);
+        challenges=data.challenges||[];
+
+        // 現在の達成状況を取得するため、Edge FunctionのGET結果を利用
+        // GETがchallengesのみを返す構成のため、既存データは別途APIで取得できない場合があります。
+        // その場合も、今回の達成操作は正常にPOSTできます。
+        if(Array.isArray(data.completed)){
+          completed=new Set(data.completed.map(Number));
+        }
+        render();
+      }catch(e){
+        showError(e.stack||e.message||String(e));
+      }
+    };
+    s.onerror=()=>showError("LINE SDKを読み込めませんでした。");
+    document.head.appendChild(s);
+  }catch(e){
+    showError(e.stack||e.message||String(e));
+  }
+})();
+</script>
+</body>
+</html>
