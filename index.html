@@ -537,11 +537,24 @@ return;
 }
 
 
-const profile =
-await liff.getProfile();
+/*
+  getProfile()ではなく、
+  LIFFのIDトークンからLINEユーザーIDを取得
+*/
+
+const idToken =
+liff.getDecodedIDToken();
+
+if(!idToken || !idToken.sub){
+
+throw new Error(
+"LINEユーザーIDを取得できませんでした"
+);
+
+}
 
 lineUserId =
-profile.userId;
+idToken.sub;
 
 
 const data =
