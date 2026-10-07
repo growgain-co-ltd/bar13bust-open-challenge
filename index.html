@@ -125,12 +125,6 @@
       min-height: 20px;
     }
 
-    .loading {
-      text-align: center;
-      padding: 50px 20px;
-      color: #aaa;
-    }
-
     .clear {
       display: none;
       background: #35d07f;
@@ -140,6 +134,31 @@
       text-align: center;
       font-weight: bold;
       margin-bottom: 20px;
+    }
+
+    /*
+     * 起動直後に表示する仮画面
+     */
+    .startup {
+      text-align: center;
+      padding: 25px 10px 10px;
+      color: #aaa;
+    }
+
+    .startup-spinner {
+      width: 22px;
+      height: 22px;
+      border: 3px solid #444;
+      border-top-color: #fff;
+      border-radius: 50%;
+      margin: 0 auto 12px;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
     }
 
   </style>
@@ -158,15 +177,10 @@
   </div>
 
 
-  <div
-    id="loading"
-    class="loading"
-  >
-    LINEと接続しています...
-  </div>
-
-
-  <div id="app" style="display:none;">
+  <!--
+    起動直後から表示する画面
+  -->
+  <div id="app">
 
     <div
       id="progress"
@@ -193,6 +207,17 @@
 
     <div id="challengeList"></div>
 
+
+    <div
+      id="startup"
+      class="startup"
+    >
+      <div class="startup-spinner"></div>
+      <div id="startupText">
+        読み込み中...
+      </div>
+    </div>
+
   </div>
 
 </div>
@@ -208,11 +233,95 @@ const API_URL =
   "https://script.google.com/macros/s/AKfycbw-yjQaB3fDoxN4U_D7WMxiAPsrAlT5Urgp8pk8vc-eww2YpMJakiBQNN5l_uI0izA/exec";
 
 
+const CACHE_KEY =
+  "bar13bust_open_challenge";
+
+
 let lineUserId = "";
 
 let challenges = [];
 
 let statuses = [];
+
+
+/**
+ * キャッシュを保存
+ */
+function saveCache() {
+
+  try {
+
+    localStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({
+        challenges: challenges,
+        statuses: statuses,
+        savedAt: Date.now()
+      })
+    );
+
+  } catch (error) {
+
+    console.log(
+      "キャッシュ保存失敗",
+      error
+    );
+  }
+}
+
+
+/**
+ * キャッシュを読み込む
+ */
+function loadCache() {
+
+  try {
+
+    const raw =
+      localStorage.getItem(
+        CACHE_KEY
+      );
+
+
+    if (!raw) {
+      return false;
+    }
+
+
+    const data =
+      JSON.parse(raw);
+
+
+    if (
+      !data ||
+      !Array.isArray(data.challenges) ||
+      !Array.isArray(data.statuses)
+    ) {
+
+      return false;
+    }
+
+
+    challenges =
+      data.challenges;
+
+
+    statuses =
+      data.statuses;
+
+
+    return true;
+
+  } catch (error) {
+
+    console.log(
+      "キャッシュ読み込み失敗",
+      error
+    );
+
+    return false;
+  }
+}
 
 
 /**
@@ -339,96 +448,7 @@ function jsonp(params) {
 
 
 /**
- * 初期化
- */
-async function init() {
-
-  try {
-
-    await liff.init({
-      liffId: LIFF_ID
-    });
-
-
-    if (!liff.isLoggedIn()) {
-
-      liff.login({
-        redirectUri:
-          window.location.href
-      });
-
-      return;
-    }
-
-
-    const profile =
-      await liff.getProfile();
-
-
-    lineUserId =
-      profile.userId;
-
-
-    /*
-     * Google Apps Scriptから
-     * 現在の状態を取得
-     */
-    const result =
-      await jsonp({
-        action: "get",
-        line_user_id: lineUserId
-      });
-
-
-    if (!result.ok) {
-
-      throw new Error(
-        result.error ||
-        "データ取得に失敗しました。"
-      );
-    }
-
-
-    challenges =
-      result.challenges || [];
-
-
-    statuses =
-      result.statuses || [];
-
-
-    render();
-
-
-    document.getElementById(
-      "loading"
-    ).style.display = "none";
-
-
-    document.getElementById(
-      "app"
-    ).style.display = "block";
-
-
-  } catch (error) {
-
-    console.error(error);
-
-
-    document.getElementById(
-      "loading"
-    ).innerHTML =
-      "エラーが発生しました。<br><br>" +
-      escapeHtml(
-        error.message ||
-        String(error)
-      );
-  }
-}
-
-
-/**
- * 画面表示
+ * 画面を表示
  */
 function render() {
 
@@ -442,6 +462,18 @@ function render() {
 
 
   let completedCount = 0;
+
+
+  /*
+   * チャレンジがまだ取得できていない場合
+   */
+  if (
+    !challenges ||
+    challenges.length === 0
+  ) {
+
+    return;
+  }
 
 
   challenges.forEach(
@@ -487,6 +519,9 @@ function render() {
         "</div>";
 
 
+      /*
+       * 達成済み
+       */
       if (status === "completed") {
 
         content +=
@@ -496,6 +531,9 @@ function render() {
       }
 
 
+      /*
+       * 確認待ち
+       */
       else if (status === "pending") {
 
         content +=
@@ -514,6 +552,9 @@ function render() {
       }
 
 
+      /*
+       * 未達成
+       */
       else {
 
         content +=
@@ -552,13 +593,193 @@ function render() {
 
 
 /**
+ * 起動時の処理
+ */
+async function init() {
+
+  /*
+   * 最初にキャッシュを表示
+   *
+   * LINE通信を待たない
+   */
+  const hasCache =
+    loadCache();
+
+
+  if (hasCache) {
+
+    render();
+
+    document.getElementById(
+      "startupText"
+    ).textContent =
+      "最新情報を確認しています...";
+
+  } else {
+
+    /*
+     * 初回利用者
+     *
+     * チャレンジの仮表示
+     */
+    challenges = [
+      "BAR 13 BUSTに来店",
+      "公式LINE友だち登録をする",
+      "キープボトルを注文（誰かと一緒に入れるもOK）",
+      "スタッフと乾杯（スタッフドリンク1杯）",
+      "ショットを注文",
+      "ダーツを1回プレイ",
+      "スタッフの誰かと写真を撮る",
+      "BAR 13 BUSTのInstagramをフォロー",
+      "InstagramのストーリーでBAR 13 BUSTをメンションする"
+    ];
+
+    statuses = [
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ];
+
+
+    render();
+
+    document.getElementById(
+      "startupText"
+    ).textContent =
+      "LINEと接続しています...";
+  }
+
+
+  try {
+
+    /*
+     * LIFF初期化
+     */
+    await liff.init({
+      liffId: LIFF_ID
+    });
+
+
+    /*
+     * 外部ブラウザの場合
+     */
+    if (!liff.isLoggedIn()) {
+
+      liff.login({
+        redirectUri:
+          window.location.href
+      });
+
+      return;
+    }
+
+
+    /*
+     * LINEユーザー情報
+     */
+    const profile =
+      await liff.getProfile();
+
+
+    lineUserId =
+      profile.userId;
+
+
+    /*
+     * 最新データ取得
+     *
+     * ここは画面表示とは別に行う
+     */
+    const result =
+      await jsonp({
+        action: "get",
+        line_user_id: lineUserId
+      });
+
+
+    if (!result.ok) {
+
+      throw new Error(
+        result.error ||
+        "データ取得に失敗しました。"
+      );
+    }
+
+
+    /*
+     * 最新状態に更新
+     */
+    challenges =
+      result.challenges || [];
+
+
+    statuses =
+      result.statuses || [];
+
+
+    /*
+     * 最新状態をキャッシュ
+     */
+    saveCache();
+
+
+    /*
+     * 最新状態を画面へ反映
+     */
+    render();
+
+
+    document.getElementById(
+      "startup"
+    ).style.display =
+      "none";
+
+
+  } catch (error) {
+
+    console.error(error);
+
+
+    /*
+     * キャッシュがある場合は
+     * そのまま使わせる
+     */
+    if (hasCache) {
+
+      document.getElementById(
+        "startupText"
+      ).textContent =
+        "最新情報を取得できませんでした。";
+
+      /*
+       * 既存データはそのまま表示
+       */
+
+    } else {
+
+      document.getElementById(
+        "startupText"
+      ).innerHTML =
+        "通信に失敗しました。<br><br>" +
+        escapeHtml(
+          error.message ||
+          String(error)
+        );
+    }
+  }
+}
+
+
+/**
  * お客様が達成申請
  *
- * ★ここが高速化ポイント
- *
- * 画面を先に変更して、
- * Google Apps Scriptへの保存を
- * 裏側で行う。
+ * 画面を先に変更
  */
 async function requestChallenge(index) {
 
@@ -566,19 +787,17 @@ async function requestChallenge(index) {
     statuses[index] || "";
 
 
-  /*
-   * すでに処理済みなら何もしない
-   */
   if (
     oldStatus === "pending" ||
     oldStatus === "completed"
   ) {
+
     return;
   }
 
 
   /*
-   * 先に画面を変更
+   * 即座に画面変更
    */
   statuses[index] =
     "pending";
@@ -593,7 +812,13 @@ async function requestChallenge(index) {
 
 
   /*
-   * ここから裏側で保存
+   * キャッシュも即更新
+   */
+  saveCache();
+
+
+  /*
+   * 裏側でサーバー保存
    */
   try {
 
@@ -623,6 +848,8 @@ async function requestChallenge(index) {
       oldStatus;
 
 
+    saveCache();
+
     render();
 
 
@@ -639,7 +866,7 @@ async function requestChallenge(index) {
 /**
  * スタッフが達成確認
  *
- * ★ここも画面を先に変更
+ * 画面を先に変更
  */
 async function confirmChallenge(index) {
 
@@ -659,7 +886,7 @@ async function confirmChallenge(index) {
 
 
   /*
-   * 先にcompletedに変更
+   * 即座にcompleted
    */
   statuses[index] =
     "completed";
@@ -674,7 +901,13 @@ async function confirmChallenge(index) {
 
 
   /*
-   * ここから裏側で保存
+   * キャッシュ更新
+   */
+  saveCache();
+
+
+  /*
+   * 裏側で保存
    */
   try {
 
@@ -703,6 +936,8 @@ async function confirmChallenge(index) {
     statuses[index] =
       oldStatus;
 
+
+    saveCache();
 
     render();
 
@@ -759,7 +994,7 @@ function escapeHtml(value) {
 
 
 /*
- * 開始
+ * 起動
  */
 init();
 
