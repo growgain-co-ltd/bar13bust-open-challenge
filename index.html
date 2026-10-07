@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>BAR 13 BUST OPEN CHALLENGE</title>
 
-<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-
 <style>
 *{box-sizing:border-box}
 
@@ -179,51 +177,51 @@ button:disabled{
 
 <div class="wrap">
 
-  <h1>
-    BAR 13 BUST<br>
-    OPEN CHALLENGE
-  </h1>
+<h1>
+BAR 13 BUST<br>
+OPEN CHALLENGE
+</h1>
 
-  <div class="sub">
-    9個達成で景品GET！
-  </div>
+<div class="sub">
+9個達成で景品GET！
+</div>
 
-  <div class="count" id="count">
-    0 / 9 CLEAR
-  </div>
+<div class="count" id="count">
+0 / 9 CLEAR
+</div>
 
-  <div class="bar">
-    <div class="fill" id="fill"></div>
-  </div>
+<div class="bar">
+<div class="fill" id="fill"></div>
+</div>
 
-  <div id="error" class="error"></div>
+<div id="error" class="error"></div>
 
-  <div id="list"></div>
+<div id="list"></div>
 
-  <div id="clear" class="clear">
-    🎉 CLEAR！🎉
-    <br>
-    <span style="font-size:14px">
-      スタッフに画面を見せて景品GET！
-    </span>
-  </div>
+<div id="clear" class="clear">
+🎉 CLEAR！🎉
+<br>
+<span style="font-size:14px">
+スタッフに画面を見せて景品GET！
+</span>
+</div>
 
-  <div class="note">
-    「達成する」を押した後、画面をスタッフに見せて
-    「達成確定」を押してもらってください。
-  </div>
+<div class="note">
+「達成する」を押した後、画面をスタッフに見せて「達成確定」を押してもらってください。
+</div>
 
 </div>
 
 <script>
 
-const LIFF_ID = "2011914396-ReXZiMYU";
+const LIFF_ID =
+"2011914396-ReXZiMYU";
 
-const SUPABASE_URL =
-  "https://hbughgnmpvuvxwcfmwd.supabase.co";
+const FUNCTION_URL =
+"https://hbughgnmpvuvxwcfmwd.supabase.co/functions/v1/bar13bust-challenge";
 
 const SUPABASE_KEY =
-  "sb_publishable_MNf7N_2NxfNOqkFRxaaX5Q_9KXTpBUg";
+"sb_publishable_MNf7N_2NxfNOqkFRxaaX5Q_9KXTpBUg";
 
 
 let lineUserId = "";
@@ -236,384 +234,371 @@ const $ = id => document.getElementById(id);
 
 
 function esc(s){
-  return String(s).replace(
-    /[&<>"']/g,
-    m => ({
-      "&":"&amp;",
-      "<":"&lt;",
-      ">":"&gt;",
-      '"':"&quot;",
-      "'":"&#39;"
-    }[m])
-  );
+return String(s).replace(
+/[&<>"']/g,
+m => ({
+"&":"&amp;",
+"<":"&lt;",
+">":"&gt;",
+'"':"&quot;",
+"'":"&#39;"
+}[m])
+);
 }
 
 
 function showError(msg){
-  $("error").textContent = msg;
-  $("error").style.display = "block";
+$("error").textContent = msg;
+$("error").style.display = "block";
 }
 
 
-async function supabaseFetch(path, options = {}){
+async function api(url, options = {}){
 
-  const headers = {
-    "apikey": SUPABASE_KEY,
-    "Authorization": "Bearer " + SUPABASE_KEY,
-    ...(options.headers || {})
-  };
+const headers = {
+"apikey": SUPABASE_KEY,
+...(options.headers || {})
+};
 
-  const response = await fetch(
-    SUPABASE_URL + path,
-    {
-      ...options,
-      headers,
-      mode:"cors",
-      cache:"no-store"
-    }
-  );
+const response = await fetch(
+url,
+{
+...options,
+headers,
+mode:"cors",
+cache:"no-store"
+}
+);
 
-  const text = await response.text();
+const text = await response.text();
 
-  if(!response.ok){
-    throw new Error(
-      "Supabase HTTP " +
-      response.status +
-      "\n" +
-      text
-    );
-  }
+let data;
 
-  if(!text){
-    return null;
-  }
-
-  try{
-    return JSON.parse(text);
-  }catch{
-    return text;
-  }
+try{
+data = JSON.parse(text);
+}catch{
+throw new Error(
+"HTTP " + response.status + "\n" + text
+);
 }
 
+if(!response.ok || data.ok === false){
+throw new Error(
+data.error || ("HTTP " + response.status)
+);
+}
 
-async function loadData(){
-
-  challenges = await supabaseFetch(
-    "/rest/v1/challenges" +
-    "?select=id,title,sort_order" +
-    "&order=sort_order.asc"
-  );
-
-  if(!Array.isArray(challenges)){
-    throw new Error("チャレンジデータの取得に失敗しました");
-  }
-
-
-  const rows = await supabaseFetch(
-    "/rest/v1/customer_challenges" +
-    "?select=challenge_id" +
-    "&line_user_id=eq." +
-    encodeURIComponent(lineUserId) +
-    "&completed=eq.true"
-  );
-
-  completed = new Set(
-    (rows || []).map(
-      x => Number(x.challenge_id)
-    )
-  );
-
-  render();
+return data;
 }
 
 
 function render(){
 
-  const list = $("list");
+const list = $("list");
 
-  list.innerHTML = "";
-
-
-  challenges.forEach((c,i)=>{
-
-    const done = completed.has(Number(c.id));
-
-    const card = document.createElement("div");
-
-    card.className = "card";
+list.innerHTML = "";
 
 
-    card.innerHTML = `
+challenges.forEach((c,i)=>{
 
-      <div class="row">
+const id = Number(c.id);
 
-        <div class="num">
-          ${done ? "✓" : i + 1}
-        </div>
+const done = completed.has(id);
 
-        <div class="body">
+const card = document.createElement("div");
 
-          <div class="title">
-            ${esc(c.title)}
-          </div>
-
-          <div class="hint">
-            ${
-              done
-              ? "達成済み"
-              : (
-                  pendingId === Number(c.id)
-                  ? "スタッフ確認待ち"
-                  : "スタッフ確認後に達成"
-                )
-            }
-          </div>
-
-        </div>
+card.className = "card";
 
 
-        ${
-          done
-          ?
-          '<button class="done" disabled>✓ 達成</button>'
-          :
-          pendingId === Number(c.id)
-          ?
-          ''
-          :
-          '<button onclick="startChallenge(' +
-          Number(c.id) +
-          ')">達成する</button>'
-        }
+card.innerHTML = `
 
-      </div>
+<div class="row">
 
+<div class="num">
+${done ? "✓" : i + 1}
+</div>
 
-      ${
-        pendingId === Number(c.id) && !done
-        ?
-        `
-        <div class="notice">
+<div class="body">
 
-          <strong>
-            この画面をスタッフに見せてください。
-          </strong>
+<div class="title">
+${esc(c.title)}
+</div>
 
-          <br>
+<div class="hint">
+${
+done
+? "達成済み"
+: pendingId === id
+? "スタッフ確認待ち"
+: "スタッフ確認後に達成"
+}
+</div>
 
-          スタッフが内容を確認したら、
-          下の「達成確定」を押してください。
+</div>
 
-        </div>
+${
+done
+?
+'<button class="done" disabled>✓ 達成</button>'
+:
+pendingId === id
+?
+''
+:
+'<button onclick="startChallenge(' + id + ')">達成する</button>'
+}
 
-        <button
-          class="confirm"
-          onclick="confirmChallenge(${Number(c.id)})"
-        >
-          達成確定
-        </button>
-
-        <button
-          class="cancel"
-          onclick="cancelPending()"
-        >
-          キャンセル
-        </button>
-        `
-        :
-        ""
-      }
-
-    `;
-
-    list.appendChild(card);
-
-  });
+</div>
 
 
-  const n = completed.size;
-  const total = challenges.length;
+${
+pendingId === id && !done
+?
+`
+<div class="notice">
+
+<strong>
+この画面をスタッフに見せてください。
+</strong>
+
+<br>
+
+スタッフが内容を確認したら、
+下の「達成確定」を押してください。
+
+</div>
+
+<button
+class="confirm"
+onclick="confirmChallenge(${id})"
+>
+達成確定
+</button>
+
+<button
+class="cancel"
+onclick="cancelPending()"
+>
+キャンセル
+</button>
+`
+:
+""
+}
+
+`;
+
+list.appendChild(card);
+
+});
 
 
-  $("count").textContent =
-    `${n} / ${total} CLEAR`;
+const n = completed.size;
 
+const total = challenges.length;
 
-  $("fill").style.width =
-    (total
-      ? Math.round(n / total * 100)
-      : 0
-    ) + "%";
+$("count").textContent =
+`${n} / ${total} CLEAR`;
 
+$("fill").style.width =
+(total ? Math.round(n / total * 100) : 0) + "%";
 
-  $("clear").style.display =
-    (total && n >= total)
-    ? "block"
-    : "none";
+$("clear").style.display =
+(total && n >= total)
+? "block"
+: "none";
+
 }
 
 
 function startChallenge(id){
 
-  if(completed.has(Number(id))){
-    return;
-  }
+id = Number(id);
 
-  pendingId = Number(id);
+if(completed.has(id)){
+return;
+}
 
-  render();
+pendingId = id;
+
+render();
+
 }
 
 
 function cancelPending(){
 
-  pendingId = null;
+pendingId = null;
 
-  render();
+render();
+
 }
 
 
 async function confirmChallenge(id){
 
-  id = Number(id);
+id = Number(id);
 
-  if(completed.has(id)){
-    return;
-  }
+if(completed.has(id)){
+return;
+}
 
-  if(pendingId !== id){
-    return;
-  }
-
-
-  const buttons =
-    document.querySelectorAll("button");
-
-  buttons.forEach(
-    b => b.disabled = true
-  );
-
-
-  try{
-
-    const existing =
-      await supabaseFetch(
-        "/rest/v1/customer_challenges" +
-        "?select=id" +
-        "&line_user_id=eq." +
-        encodeURIComponent(lineUserId) +
-        "&challenge_id=eq." +
-        id +
-        "&limit=1"
-      );
-
-
-    if(existing && existing.length > 0){
-
-      await supabaseFetch(
-        "/rest/v1/customer_challenges" +
-        "?id=eq." +
-        existing[0].id,
-        {
-          method:"PATCH",
-          headers:{
-            "Content-Type":"application/json",
-            "Prefer":"return=minimal"
-          },
-          body:JSON.stringify({
-            completed:true
-          })
-        }
-      );
-
-    }else{
-
-      await supabaseFetch(
-        "/rest/v1/customer_challenges",
-        {
-          method:"POST",
-          headers:{
-            "Content-Type":"application/json",
-            "Prefer":"return=minimal"
-          },
-          body:JSON.stringify({
-            line_user_id:lineUserId,
-            challenge_id:id,
-            completed:true
-          })
-        }
-      );
-
-    }
-
-
-    completed.add(id);
-
-    pendingId = null;
-
-    render();
-
-
-  }catch(e){
-
-    showError(
-      "達成確定に失敗しました。\n\n" +
-      (e.message || String(e))
-    );
-
-    render();
-  }
+if(pendingId !== id){
+return;
 }
 
 
-window.startChallenge = startChallenge;
-window.confirmChallenge = confirmChallenge;
-window.cancelPending = cancelPending;
+const buttons =
+document.querySelectorAll("button");
+
+buttons.forEach(
+b => b.disabled = true
+);
 
 
-async function start(){
+try{
 
-  try{
+await api(
+FUNCTION_URL,
+{
+method:"POST",
 
-    await liff.init({
-      liffId: LIFF_ID
-    });
+headers:{
+"Content-Type":"application/json"
+},
 
-
-    if(!liff.isLoggedIn()){
-
-      liff.login({
-        redirectUri: location.href
-      });
-
-      return;
-    }
-
-
-    const profile =
-      await liff.getProfile();
+body:JSON.stringify({
+line_user_id:lineUserId,
+challenge_id:id
+})
+}
+);
 
 
-    lineUserId =
-      profile.userId;
+completed.add(id);
+
+pendingId = null;
+
+render();
 
 
-    await loadData();
+}catch(e){
 
+showError(
+"達成確定に失敗しました。\n\n" +
+(e.message || String(e))
+);
 
-  }catch(e){
+render();
 
-    showError(
-      "初期化に失敗しました。\n\n" +
-      (e.message || String(e))
-    );
+}
 
-    console.error(e);
-  }
 }
 
 
-start();
+window.startChallenge =
+startChallenge;
+
+window.confirmChallenge =
+confirmChallenge;
+
+window.cancelPending =
+cancelPending;
+
+
+(async()=>{
+
+try{
+
+const s =
+document.createElement("script");
+
+s.src =
+"https://static.line-scdn.net/liff/edge/2/sdk.js";
+
+
+s.onload = async()=>{
+
+try{
+
+await liff.init({
+liffId:LIFF_ID
+});
+
+
+if(!liff.isLoggedIn()){
+
+liff.login({
+redirectUri:location.href
+});
+
+return;
+
+}
+
+
+const profile =
+await liff.getProfile();
+
+lineUserId =
+profile.userId;
+
+
+const data =
+await api(
+FUNCTION_URL +
+"?line_user_id=" +
+encodeURIComponent(lineUserId)
+);
+
+
+challenges =
+data.challenges || [];
+
+
+completed =
+new Set(
+(data.completed || []).map(Number)
+);
+
+
+render();
+
+
+}catch(e){
+
+showError(
+"初期化に失敗しました。\n\n" +
+(e.message || String(e))
+);
+
+}
+
+};
+
+
+s.onerror = ()=>{
+
+showError(
+"LINE SDKを読み込めませんでした。"
+);
+
+};
+
+
+document.head.appendChild(s);
+
+
+}catch(e){
+
+showError(
+"初期化に失敗しました。\n\n" +
+(e.message || String(e))
+);
+
+}
+
+})();
 
 </script>
 
