@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>BAR 13 BUST OPEN CHALLENGE</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *{box-sizing:border-box} body{margin:0;background:#101010;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif}
+    .wrap{max-width:560px;margin:auto;padding:20px 16px 40px}.hero{text-align:center;padding:18px 0 12px}
+    h1{font-size:25px;margin:0 0 6px;letter-spacing:.04em}.sub{color:#bbb;font-size:13px}
+    .count{font-size:28px;font-weight:800;margin:18px 0 4px}.bar{height:9px;background:#333;border-radius:99px;overflow:hidden}.bar i{display:block;height:100%;background:#fff;width:0}
+    .card{background:#1c1c1c;border:1px solid #333;border-radius:16px;padding:14px;margin-top:12px}
+    .row{display:flex;align-items:center;gap:12px}.num{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:#333;font-weight:700;flex:none}
+    .done .num{background:#fff;color:#111}.title{font-weight:700;line-height:1.45}.status{margin-left:auto;font-size:12px;color:#999}.done .status{color:#fff}
+    button{border:0;border-radius:12px;padding:11px 14px;font-weight:700;cursor:pointer;background:#fff;color:#111}.small{font-size:12px;padding:8px 10px;margin-top:10px}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.muted{color:#999;font-size:12px;margin-top:16px;line-height:1.6}
+    .clear{display:none;text-align:center;background:#fff;color:#111;border-radius:16px;padding:18px;margin-top:16px;font-weight:800;font-size:20px}
+    .msg{margin-top:12px;padding:10px;border-radius:10px;background:#292929;font-size:13px;display:none}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <h1>BAR 13 BUST<br>OPEN CHALLENGE</h1>
+    <div class="sub">9個達成で景品GET！</div>
+    <div class="count" id="count">0 / 9 CLEAR</div>
+    <div class="bar"><i id="bar"></i></div>
+  </div>
+  <div id="list"></div>
+  <div class="clear" id="clear">🎉 CLEAR！🎉<br><span style="font-size:14px">スタッフに画面を見せて景品GET！</span></div>
+  <div class="msg" id="msg"></div>
+  <div class="muted">達成した項目はスタッフに確認してもらってください。</div>
+</div>
+<script>
+const LIFF_ID = "ここにLIFF_ID";
+const SUPABASE_URL = "ここにSupabase_URL";
+const SUPABASE_PUBLISHABLE_KEY = "ここにPublishable_key";
+const STAFF_PIN = "1313"; // 店舗用。公開前に変更してください。
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+let lineUserId = null;
+let challenges = [];
+let completed = new Set();
+
+function msg(t){const e=document.getElementById("msg");e.textContent=t;e.style.display="block";setTimeout(()=>e.style.display="none",2500)}
+async function init(){
+  if(LIFF_ID.includes("ここに")) throw new Error("LIFF_IDを設定してください");
+  await liff.init({liffId:LIFF_ID});
+  if(!liff.isLoggedIn()){ liff.login(); return; }
+  const p=await liff.getProfile(); lineUserId=p.userId;
+  const {data:c,error:ce}=await sb.from("challenges").select("*").order("id",{ascending:true});
+  if(ce) throw ce; challenges=c||[];
+  const {data:d,error:de}=await sb.from("customer_challenges").select("challenge_id,completed").eq("line_user_id",lineUserId).eq("completed",true);
+  if(de) throw de; completed=new Set((d||[]).map(x=>x.challenge_id));
+  render();
+}
+function render(){
+  const list=document.getElementById("list"); list.innerHTML="";
+  challenges.forEach((c,i)=>{
+    const done=completed.has(c.id), card=document.createElement("div");
+    card.className="card"+(done?" done":"");
+    card.innerHTML=`<div class="row"><div class="num">${done?"✓":i+1}</div><div class="title">${escapeHtml(c.title)}</div><div class="status">${done?"達成済み":"未達成"}</div></div>`;
+    if(!done){
+      const a=document.createElement("div"); a.className="actions";
+      const b=document.createElement("button"); b.className="small"; b.textContent="スタッフ確認"; 
+      b.onclick=()=>confirmByStaff(c.id,c.title); a.appendChild(b); card.appendChild(a);
+    }
+    list.appendChild(card);
+  });
+  const n=completed.size,total=challenges.length;
+  document.getElementById("count").textContent=`${n} / ${total} CLEAR`;
+  document.getElementById("bar").style.width=(total?Math.round(n/total*100):0)+"%";
+  document.getElementById("clear").style.display=(total&&n>=total)?"block":"none";
+}
+async function confirmByStaff(id,title){
+  const pin=prompt(`「${title}」をスタッフ確認します。\nスタッフPINを入力してください。`);
+  if(pin===null)return;
+  if(pin!==STAFF_PIN){alert("PINが違います。");return;}
+  const {error}=await sb.from("customer_challenges").insert({line_user_id:lineUserId,challenge_id:id,completed:true});
+  if(error){console.error(error);alert("登録に失敗しました。既に登録済みの場合は再読み込みしてください。");return;}
+  completed.add(id); render(); msg("達成しました！");
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+init().catch(e=>{console.error(e);alert("初期設定がまだ完了していません。設定値を確認してください。");});
+</script>
+</body>
+</html>
